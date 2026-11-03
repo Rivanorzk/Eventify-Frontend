@@ -1,8 +1,9 @@
 // app/customer/vouchers/page.js
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
     Gift,
     Ticket,
@@ -75,6 +76,10 @@ const getErrorMessage = (err) =>
     err?.message ||
     "Terjadi kesalahan. Silakan coba lagi.";
 
+// Aturan yang sama dipakai untuk input manual dan kode dari notifikasi.
+const normalizeCode = (value) =>
+    String(value || "").toUpperCase().replace(/\s/g, "").slice(0, 50);
+
 const compactRupiah = (value) => {
     const n = Number(value) || 0;
     if (n >= 1_000_000) return `Rp${+(n / 1_000_000).toFixed(1)}jt`;
@@ -95,10 +100,21 @@ const byTab = (tabKey) => (a, b) => {
 // Form redeem
 // ---------------------------------------------------------------------
 
-function RedeemBox({ onRedeemed }) {
-    const [code, setCode] = useState("");
+function RedeemBox({ onRedeemed, initialCode = "" }) {
+    const [code, setCode] = useState(() => normalizeCode(initialCode));
+    const [prefilled, setPrefilled] = useState(Boolean(initialCode));
     const [loading, setLoading] = useState(false);
     const [feedback, setFeedback] = useState(null);
+
+    // Kalau customer klik notifikasi lain saat sudah berada di halaman ini,
+    // kolom ikut terisi dengan kode yang baru.
+    useEffect(() => {
+        if (initialCode) {
+            setCode(normalizeCode(initialCode));
+            setPrefilled(true);
+            setFeedback(null);
+        }
+    }, [initialCode]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -118,6 +134,7 @@ function RedeemBox({ onRedeemed }) {
 
             onRedeemed(voucher);
             setCode("");
+            setPrefilled(false);
             setFeedback({
                 type: "success",
                 text: voucher?.event_title
@@ -159,7 +176,8 @@ function RedeemBox({ onRedeemed }) {
                             type="text"
                             value={code}
                             onChange={(e) => {
-                                setCode(e.target.value.toUpperCase().replace(/\s/g, ""));
+                                setCode(normalizeCode(e.target.value));
+                                setPrefilled(false);
                                 if (feedback) setFeedback(null);
                             }}
                             placeholder="Contoh: KONSER2027"
@@ -181,6 +199,14 @@ function RedeemBox({ onRedeemed }) {
                     </form>
 
                     <div aria-live="polite" className="min-h-[1.25rem]">
+                        {prefilled && !feedback && (
+                            <p className="mt-3 flex items-start gap-2 text-sm text-[#7A1F2B]">
+                                <Gift className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                                <span>
+                                    Kode terisi otomatis dari notifikasi. Tinggal tekan &quot;Tukar kode&quot;.
+                                </span>
+                            </p>
+                        )}
                         {feedback && (
                             <p
                                 className={`mt-3 flex items-start gap-2 text-sm ${
@@ -337,7 +363,13 @@ function VoucherCard({ voucher }) {
 // Halaman
 // ---------------------------------------------------------------------
 
-export default function VouchersPage() {
+function VouchersContent() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+
+    // Kode dari link notifikasi: /customer/vouchers?code=KODE
+    const initialCode = searchParams.get("code") || "";
+
     const [vouchers, setVouchers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -364,6 +396,12 @@ export default function VouchersPage() {
     const handleRedeemed = (voucher) => {
         setVouchers((prev) => [voucher, ...prev.filter((v) => v.id !== voucher.id)]);
         setActiveTab("available");
+
+        // Bersihkan ?code= supaya refresh halaman tidak mengisi ulang
+        // kode yang sudah ditukar.
+        if (initialCode) {
+            router.replace("/customer/vouchers", { scroll: false });
+        }
     };
 
     const grouped = useMemo(() => {
@@ -387,7 +425,7 @@ export default function VouchersPage() {
             />
 
             <div className="mt-8 space-y-8">
-                <RedeemBox onRedeemed={handleRedeemed} />
+                <RedeemBox onRedeemed={handleRedeemed} initialCode={initialCode} />
 
                 {loading ? (
                     <LoadingSpinner text="Memuat voucher..." />
@@ -464,5 +502,15 @@ export default function VouchersPage() {
                 )}
             </div>
         </div>
+    );
+}
+
+// useSearchParams di App Router wajib berada di dalam <Suspense>,
+// kalau tidak build produksi bisa gagal.
+export default function VouchersPage() {
+    return (
+        <Suspense fallback={<LoadingSpinner text="Memuat voucher..." />}>
+            <VouchersContent />
+        </Suspense>
     );
 }

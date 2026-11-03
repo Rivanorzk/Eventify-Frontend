@@ -7,8 +7,7 @@ import {
     Gift,
     CheckCircle,
     XCircle,
-    Clock,
-    AlertCircle
+    Ticket
 } from "lucide-react";
 import Link from "next/link";
 
@@ -17,6 +16,7 @@ const iconMap = {
     payment: CreditCard,
     event: Calendar,
     promo: Gift,
+    ticket: Ticket,
     system: Bell
 };
 
@@ -25,6 +25,7 @@ const typeColors = {
     payment: "bg-green-50 text-green-600",
     event: "bg-purple-50 text-purple-600",
     promo: "bg-orange-50 text-orange-600",
+    ticket: "bg-purple-50 text-purple-600",
     system: "bg-gray-50 text-gray-600"
 };
 
@@ -71,6 +72,20 @@ export default function NotificationItem({
         onDelete?.(notification.id);
     };
 
+    // Saat customer membuka link notifikasi, tandai terbaca tanpa toast
+    // (toast akan muncul tiba-tiba di halaman tujuan).
+    const handleOpen = () => {
+        if (!notification.is_read) {
+            onMarkAsRead?.(notification.id, { silent: true });
+        }
+    };
+
+    // Area ikon + isi menjadi satu link besar kalau notifikasi punya link.
+    const Wrapper = notification.link ? Link : "div";
+    const wrapperProps = notification.link
+        ? { href: notification.link, onClick: handleOpen }
+        : {};
+
     return (
         <div 
             className={`
@@ -80,40 +95,48 @@ export default function NotificationItem({
             `}
         >
             <div className="flex gap-4">
-                {/* Icon */}
-                <div className={`flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center ${colorClass}`}>
-                    <Icon className="w-5 h-5" />
-                </div>
+                {/* Area yang bisa diklik: ikon + isi */}
+                <Wrapper
+                    {...wrapperProps}
+                    className="flex flex-1 min-w-0 gap-4 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7A1F2B]/40"
+                >
+                    {/* Icon */}
+                    <div className={`flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center ${colorClass}`}>
+                        <Icon className="w-5 h-5" />
+                    </div>
 
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                        <div>
-                            <p className="font-semibold text-[#1E1E1E] text-sm">
-                                {notification.title}
-                            </p>
-                            <p className="text-sm text-[#737373] mt-1 line-clamp-2">
-                                {notification.message}
-                            </p>
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                            <div>
+                                <p className="font-semibold text-[#1E1E1E] text-sm">
+                                    {notification.title}
+                                </p>
+                                {/* Pesan promo tidak dipotong agar kode voucher terbaca penuh */}
+                                <p
+                                    className={`text-sm text-[#737373] mt-1 ${
+                                        notification.type === "promo" ? "" : "line-clamp-2"
+                                    }`}
+                                >
+                                    {notification.message}
+                                </p>
+                            </div>
+                            {getStatusIcon()}
                         </div>
-                        {getStatusIcon()}
-                    </div>
 
-                    <div className="flex items-center gap-3 mt-3">
-                        <span className="text-xs text-[#A68C8C]">
-                            {formatTime(notification.created_at)}
-                        </span>
-                        
-                        {notification.link && (
-                            <Link
-                                href={notification.link}
-                                className="text-xs font-medium text-[#7A1F2B] hover:underline"
-                            >
-                                View Details →
-                            </Link>
-                        )}
+                        <div className="flex items-center gap-3 mt-3">
+                            <span className="text-xs text-[#A68C8C]">
+                                {formatTime(notification.created_at)}
+                            </span>
+
+                            {notification.link && (
+                                <span className="text-xs font-medium text-[#7A1F2B]">
+                                    View Details →
+                                </span>
+                            )}
+                        </div>
                     </div>
-                </div>
+                </Wrapper>
 
                 {/* Actions */}
                 <div className="flex flex-col gap-1">

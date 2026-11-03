@@ -3,14 +3,12 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { Bell, ArrowLeft, RefreshCw } from "lucide-react";
+import { Bell, RefreshCw } from "lucide-react";
 
 import NotificationItem from "@/components/notificationItem";
 import NotificationFilters from "@/components/notificationFilter";
 import LoadingSpinner from "@/components/loadingSpinner";
 import EmptyState from "@/components/emptyState";
-import SectionHeader from "@/components/sectionHeader";
 
 import { 
     getNotifications, 
@@ -24,6 +22,8 @@ import {
 import useAuth from "@/hooks/useAuth";
 import { toast } from "react-hot-toast";
 
+const PAGE_SIZE = 20;
+
 export default function NotificationsPage() {
     const router = useRouter();
     const { user, loading: authLoading } = useAuth();
@@ -32,13 +32,10 @@ export default function NotificationsPage() {
     const [filteredNotifications, setFilteredNotifications] = useState([]);
     const [activeFilter, setActiveFilter] = useState('all');
     const [unreadCount, setUnreadCount] = useState(0);
+    const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState(null);
-    const [pagination, setPagination] = useState({
-        limit: 20,
-        offset: 0,
-        total: 0
-    });
 
     // Check auth
     useEffect(() => {
@@ -52,24 +49,19 @@ export default function NotificationsPage() {
         }
     }, [user, authLoading, router]);
 
-    // Load notifications
+    // Load notifications (halaman pertama / refresh)
     const loadNotifications = useCallback(async () => {
         try {
             setLoading(true);
             setError(null);
 
             const result = await getNotifications({
-                limit: pagination.limit,
-                offset: pagination.offset
+                limit: PAGE_SIZE,
+                offset: 0
             });
 
-            console.log('Notifications:', result); // Debug
-
             setNotifications(result.data || []);
-            setPagination(prev => ({
-                ...prev,
-                total: result.meta?.total || 0
-            }));
+            setTotal(result.meta?.total || 0);
 
             // Get unread count
             const unread = await getUnreadCount();
@@ -81,7 +73,7 @@ export default function NotificationsPage() {
         } finally {
             setLoading(false);
         }
-    }, [pagination.limit, pagination.offset]);
+    }, []);
 
     useEffect(() => {
         if (!authLoading && user) {
@@ -102,17 +94,43 @@ export default function NotificationsPage() {
         setFilteredNotifications(filtered);
     }, [notifications, activeFilter]);
 
+    // Handle load more: tambahkan ke daftar, bukan menimpa
+    const handleLoadMore = async () => {
+        try {
+            setLoadingMore(true);
+
+            const result = await getNotifications({
+                limit: PAGE_SIZE,
+                offset: notifications.length
+            });
+
+            setNotifications(prev => {
+                const existingIds = new Set(prev.map(n => n.id));
+                const fresh = (result.data || []).filter(n => !existingIds.has(n.id));
+                return [...prev, ...fresh];
+            });
+            setTotal(result.meta?.total ?? total);
+
+        } catch (err) {
+            console.error('Error loading more notifications:', err);
+            toast.error('Gagal memuat notifikasi berikutnya');
+        } finally {
+            setLoadingMore(false);
+        }
+    };
+
     // Handle mark as read
-    const handleMarkAsRead = async (id) => {
+    // silent = true dipakai saat customer membuka link notifikasi (tanpa toast)
+    const handleMarkAsRead = async (id, { silent = false } = {}) => {
         try {
             await markAsRead(id);
             setNotifications(prev => 
                 prev.map(n => n.id === id ? { ...n, is_read: true } : n)
             );
             setUnreadCount(prev => Math.max(0, prev - 1));
-            toast.success('Notification marked as read');
+            if (!silent) toast.success('Notification marked as read');
         } catch (error) {
-            toast.error('Failed to mark as read');
+            if (!silent) toast.error('Failed to mark as read');
         }
     };
 
@@ -133,9 +151,12 @@ export default function NotificationsPage() {
     // Handle delete
     const handleDelete = async (id) => {
         try {
+            const wasUnread = !notifications.find(n => n.id === id)?.is_read;
+
             await deleteNotification(id);
             setNotifications(prev => prev.filter(n => n.id !== id));
-            if (!notifications.find(n => n.id === id)?.is_read) {
+            setTotal(prev => Math.max(0, prev - 1));
+            if (wasUnread) {
                 setUnreadCount(prev => Math.max(0, prev - 1));
             }
             toast.success('Notification deleted');
@@ -151,6 +172,7 @@ export default function NotificationsPage() {
         try {
             await deleteAllNotifications();
             setNotifications([]);
+            setTotal(0);
             setUnreadCount(0);
             toast.success('All notifications cleared');
         } catch (error) {
@@ -270,19 +292,14 @@ export default function NotificationsPage() {
                 )}
 
                 {/* Load More */}
-                {filteredNotifications.length < pagination.total && (
+                {notifications.length < total && (
                     <div className="mt-6 text-center">
                         <button
-                            onClick={() => {
-                                setPagination(prev => ({
-                                    ...prev,
-                                    offset: prev.offset + prev.limit
-                                }));
-                                loadNotifications();
-                            }}
-                            className="px-6 py-2.5 bg-[#5B0F18] text-[#F8F1E7] rounded-xl text-sm font-semibold hover:bg-[#7A1F2B] transition"
+                            onClick={handleLoadMore}
+                            disabled={loadingMore}
+                            className="px-6 py-2.5 bg-[#5B0F18] text-[#F8F1E7] rounded-xl text-sm font-semibold hover:bg-[#7A1F2B] transition disabled:opacity-60 disabled:cursor-not-allowed"
                         >
-                            Load More
+                            {loadingMore ? 'Loading...' : 'Load More'}
                         </button>
                     </div>
                 )}
