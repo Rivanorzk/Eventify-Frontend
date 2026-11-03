@@ -1,7 +1,7 @@
 // app/customer/checkout/page.js
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -11,6 +11,7 @@ import {
     Loader2,
     MapPin,
     Music,
+    RefreshCw,
     ShieldCheck,
     Ticket,
     X,
@@ -19,11 +20,126 @@ import { toast } from "react-hot-toast";
 
 import { getEventById } from "@/services/eventService";
 import { createOrder } from "@/services/orderService";
-import { validateVoucher } from "@/services/voucherService";
+import { getAvailableVouchers } from "@/services/voucherService";
 import { isAuthenticated } from "@/lib/auth";
 import LoadingSpinner from "@/components/loadingSpinner";
 import EmptyState from "@/components/emptyState";
 import { currency, formatDate, formatTime } from "@/lib/formatter";
+
+// Pesan dari backend ada di response.data.message; err.message dari axios
+// hanya "Request failed with status code 400".
+const getErrorMessage = (err, fallback) =>
+    err?.response?.data?.message || err?.data?.message || fallback;
+
+const compactRupiah = (value) => {
+    const n = Number(value) || 0;
+    if (n >= 1_000_000) return `Rp${+(n / 1_000_000).toFixed(1)}jt`;
+    if (n >= 1_000) return `Rp${+(n / 1_000).toFixed(1)}rb`;
+    return `Rp${n}`;
+};
+
+const discountLabel = (voucher) =>
+    voucher.discount_type === "percentage"
+        ? `${Number(voucher.discount_value)}%`
+        : compactRupiah(voucher.discount_value);
+
+// Perkiraan diskon untuk tampilan. Angka final tetap dihitung server saat order dibuat.
+const estimateDiscount = (voucher, subtotal) => {
+    if (!voucher) return 0;
+
+    const value = Number(voucher.discount_value);
+    let raw;
+
+    if (voucher.discount_type === "percentage") {
+        raw = Math.floor((subtotal * value) / 100);
+
+        if (
+            voucher.maximum_discount !== null &&
+            voucher.maximum_discount !== undefined &&
+            raw > Number(voucher.maximum_discount)
+        ) {
+            raw = Number(voucher.maximum_discount);
+        }
+    } else {
+        raw = value;
+    }
+
+    return Math.min(raw, subtotal);
+};
+
+// Persentase biaya layanan diambil OTOMATIS dari backend (event.service_fee_percent,
+// sama dengan pengaturan superadmin), jadi tidak perlu diubah manual. Env
+// NEXT_PUBLIC_SERVICE_FEE_PERCENT hanya cadangan kalau backend belum mengirimnya.
+// Angka di checkout tetap PERKIRAAN; total final dihitung server saat order
+// dibuat dan ditampilkan di halaman pembayaran.
+const ENV_FEE_PERCENT = Number(process.env.NEXT_PUBLIC_SERVICE_FEE_PERCENT);
+
+const resolveFeePercent = (fromApi) => {
+    const value =
+        fromApi !== null && fromApi !== undefined
+            ? Number(fromApi)
+            : ENV_FEE_PERCENT;
+    return Number.isFinite(value) && value > 0 ? value : 0;
+};
+
+// Rumus sama dengan backend: dari harga tiket setelah diskon, dibulatkan ke rupiah.
+const estimateServiceFee = (amountAfterDiscount, percent) =>
+    percent > 0 ? Math.round((amountAfterDiscount * percent) / 100) : 0;
+
+const formatPercent = (value) =>
+    `${new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 }).format(Number(value) || 0)}%`;
+
+// Satu pilihan voucher (radio).
+function VoucherOption({ voucher, selected, quantity, onSelect }) {
+    const minimum = Number(voucher.minimum_quantity) || 1;
+    const disabled = quantity < minimum;
+
+    return (
+        <button
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            disabled={disabled}
+            onClick={() => onSelect(voucher.id)}
+            className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7A1F2B]/40 ${
+                selected
+                    ? "border-[#7A1F2B] bg-[#FBF3F1]"
+                    : "border-[#E5D6D0] bg-white hover:border-[#C9A9A2]"
+            } ${disabled ? "cursor-not-allowed opacity-55" : ""}`}
+        >
+            <div
+                className={`flex h-12 w-14 shrink-0 items-center justify-center rounded-lg px-1 text-center text-sm font-extrabold tabular-nums text-white ${
+                    disabled ? "bg-[#7C726F]" : "bg-[#5B0F18]"
+                }`}
+            >
+                {discountLabel(voucher)}
+            </div>
+
+            <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-[#1E1E1E]">
+                    {voucher.title || voucher.promo_code}
+                </p>
+                <p className="mt-0.5 text-xs text-[#8C7777]">
+                    {disabled
+                        ? `Butuh minimal ${minimum} tiket`
+                        : `Berlaku sampai ${formatDate(voucher.end_date)}`}
+                </p>
+                {!disabled && minimum > 1 && (
+                    <p className="text-xs text-[#8C7777]">Minimal {minimum} tiket</p>
+                )}
+            </div>
+
+            <span
+                aria-hidden="true"
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+                    selected ? "border-[#7A1F2B]" : "border-[#D9C5BE]"
+                }`}
+            >
+                {selected && <span className="h-2.5 w-2.5 rounded-full bg-[#7A1F2B]" />}
+            </span>
+        </button>
+    );
+}
 
 export default function CheckoutPage() {
     const router = useRouter();
@@ -44,9 +160,11 @@ export default function CheckoutPage() {
             : 1
     );
 
-    const [voucherInput, setVoucherInput] = useState("");
-    const [appliedVoucher, setAppliedVoucher] = useState(null);
-    const [voucherLoading, setVoucherLoading] = useState(false);
+    // Voucher milik customer untuk event ini (dari /vouchers/available)
+    const [vouchers, setVouchers] = useState([]);
+    const [vouchersLoading, setVouchersLoading] = useState(true);
+    const [vouchersError, setVouchersError] = useState(false);
+    const [selectedVoucherId, setSelectedVoucherId] = useState(null);
 
     const [submitting, setSubmitting] = useState(false);
 
@@ -96,7 +214,7 @@ export default function CheckoutPage() {
                 setQuantity((q) => Math.min(Math.max(q, 1), selected.remaining_stock || 1));
             } catch (err) {
                 console.error("Error loading checkout data:", err);
-                setError(err.message || "Gagal memuat data checkout");
+                setError(getErrorMessage(err, "Gagal memuat data checkout"));
             } finally {
                 setLoading(false);
             }
@@ -106,61 +224,78 @@ export default function CheckoutPage() {
     }, [eventId, ticketId]);
 
     // =========================
-    // Reset voucher kalau quantity berubah (minimum_ticket bisa berubah validitasnya)
+    // Load voucher milik customer untuk event ini
+    // =========================
+    const loadVouchers = useCallback(async () => {
+        if (!eventId) return;
+
+        try {
+            setVouchersLoading(true);
+            setVouchersError(false);
+
+            const data = await getAvailableVouchers(eventId);
+            const list = Array.isArray(data) ? data : [];
+
+            setVouchers(list);
+            // Lepas pilihan kalau voucher-nya sudah tidak tersedia
+            setSelectedVoucherId((prev) =>
+                list.some((v) => v.id === prev) ? prev : null
+            );
+        } catch (err) {
+            console.error("Error loading vouchers:", err);
+            setVouchersError(true);
+        } finally {
+            setVouchersLoading(false);
+        }
+    }, [eventId]);
+
+    useEffect(() => {
+        if (isAuthenticated()) {
+            loadVouchers();
+        }
+    }, [loadVouchers]);
+
+    const selectedVoucher = useMemo(
+        () => vouchers.find((v) => v.id === selectedVoucherId) || null,
+        [vouchers, selectedVoucherId]
+    );
+
+    // =========================
+    // Lepas voucher kalau jumlah tiket turun di bawah minimumnya
     // =========================
     useEffect(() => {
-        if (appliedVoucher) {
-            setAppliedVoucher(null);
-            toast("Voucher perlu diterapkan ulang karena jumlah tiket berubah", {
+        if (!selectedVoucher) return;
+
+        const minimum = Number(selectedVoucher.minimum_quantity) || 1;
+
+        if (quantity < minimum) {
+            setSelectedVoucherId(null);
+            toast(`Voucher dilepas, butuh minimal ${minimum} tiket`, {
                 icon: "ℹ️",
             });
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [quantity]);
+    }, [quantity, selectedVoucher]);
 
     const subtotal = useMemo(() => {
         if (!ticket) return 0;
         return ticket.price * quantity;
     }, [ticket, quantity]);
 
-    const discount = useMemo(() => {
-        if (!appliedVoucher) return 0;
+    const discount = useMemo(
+        () => estimateDiscount(selectedVoucher, subtotal),
+        [selectedVoucher, subtotal]
+    );
 
-        const raw =
-            appliedVoucher.discount_type === "percentage"
-                ? (subtotal * appliedVoucher.discount_value) / 100
-                : Number(appliedVoucher.discount_value);
-
-        return Math.min(raw, subtotal);
-    }, [appliedVoucher, subtotal]);
-
+    // Harga tiket setelah diskon, lalu ditambah biaya layanan (perkiraan).
     const finalPrice = Math.max(subtotal - discount, 0);
+    const feePercent = resolveFeePercent(event?.service_fee_percent);
+    const hasFeeEstimate = feePercent > 0;
+    const serviceFee = estimateServiceFee(finalPrice, feePercent);
+    const grandTotal = finalPrice + serviceFee;
 
-    const handleApplyVoucher = async () => {
-        if (!voucherInput.trim()) {
-            toast.error("Masukkan kode voucher terlebih dahulu");
-            return;
-        }
-
-        try {
-            setVoucherLoading(true);
-            const voucher = await validateVoucher(
-                voucherInput.trim(),
-                quantity
-            );
-            setAppliedVoucher(voucher);
-            toast.success(`Voucher ${voucher.promo_code} berhasil diterapkan`);
-        } catch (err) {
-            setAppliedVoucher(null);
-            toast.error(err.message || "Voucher tidak valid");
-        } finally {
-            setVoucherLoading(false);
-        }
-    };
-
-    const handleRemoveVoucher = () => {
-        setAppliedVoucher(null);
-        setVoucherInput("");
+    const handleSelectVoucher = (id) => {
+        // Klik voucher yang sama sekali lagi = lepas
+        setSelectedVoucherId((prev) => (prev === id ? null : id));
     };
 
     const handleCheckout = async () => {
@@ -181,7 +316,7 @@ export default function CheckoutPage() {
 
             const order = await createOrder({
                 event_id: Number(eventId),
-                voucher_code: appliedVoucher?.promo_code || undefined,
+                user_voucher_id: selectedVoucher?.id ?? null,
                 tickets: [
                     {
                         ticket_category_id: ticket.id,
@@ -194,7 +329,9 @@ export default function CheckoutPage() {
             router.push(`/customer/payment/${order.id}`);
         } catch (err) {
             console.error("Checkout error:", err);
-            toast.error(err.message || "Gagal membuat order");
+            toast.error(getErrorMessage(err, "Gagal membuat order"));
+            // Status voucher mungkin berubah (mis. sudah terpakai / kedaluwarsa)
+            loadVouchers();
         } finally {
             setSubmitting(false);
         }
@@ -341,52 +478,66 @@ export default function CheckoutPage() {
 
                 {/* VOUCHER */}
                 <div className="rounded-2xl bg-white p-5 shadow-sm">
-                    <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-[#1E1E1E]">
-                        <BadgePercent className="h-4 w-4 text-[#7A1F2B]" />
-                        Kode Voucher
-                    </h3>
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                        <h3 className="flex items-center gap-2 text-sm font-bold text-[#1E1E1E]">
+                            <BadgePercent className="h-4 w-4 text-[#7A1F2B]" />
+                            Voucher
+                        </h3>
 
-                    {appliedVoucher ? (
-                        <div className="flex items-center justify-between rounded-xl bg-[#F8F1E7] px-4 py-3">
-                            <div>
-                                <p className="text-sm font-semibold text-[#1E7A4C]">
-                                    {appliedVoucher.promo_code} diterapkan
-                                </p>
-                                <p className="text-xs text-[#8C7777]">
-                                    {appliedVoucher.discount_type === "percentage"
-                                        ? `Diskon ${appliedVoucher.discount_value}%`
-                                        : `Diskon ${currency(appliedVoucher.discount_value)}`}
-                                </p>
-                            </div>
+                        {selectedVoucher && (
                             <button
-                                onClick={handleRemoveVoucher}
-                                className="flex h-8 w-8 items-center justify-center rounded-full text-[#8C7777] transition hover:bg-white hover:text-[#B3261E]"
+                                type="button"
+                                onClick={() => setSelectedVoucherId(null)}
+                                className="inline-flex items-center gap-1 rounded-md text-xs font-semibold text-[#8C7777] transition hover:text-[#B3261E] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7A1F2B]/40"
                             >
-                                <X className="h-4 w-4" />
+                                <X className="h-3.5 w-3.5" />
+                                Lepas voucher
+                            </button>
+                        )}
+                    </div>
+
+                    {vouchersLoading ? (
+                        <div className="flex items-center gap-2 text-sm text-[#8C7777]">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Memuat voucher Anda...
+                        </div>
+                    ) : vouchersError ? (
+                        <div className="flex items-center justify-between gap-3 rounded-xl bg-[#F8F1E7] px-4 py-3 text-sm text-[#8C7777]">
+                            <span>Voucher gagal dimuat. Anda tetap bisa lanjut tanpa voucher.</span>
+                            <button
+                                type="button"
+                                onClick={loadVouchers}
+                                className="inline-flex shrink-0 items-center gap-1.5 font-semibold text-[#7A1F2B] hover:underline"
+                            >
+                                <RefreshCw className="h-3.5 w-3.5" />
+                                Coba lagi
                             </button>
                         </div>
-                    ) : (
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
-                                value={voucherInput}
-                                onChange={(e) =>
-                                    setVoucherInput(e.target.value.toUpperCase())
-                                }
-                                placeholder="Masukkan kode voucher"
-                                className="flex-1 rounded-xl border border-[#E5D6D0] px-4 py-2.5 text-sm text-[#1E1E1E] outline-none transition focus:border-[#7A1F2B]"
-                            />
-                            <button
-                                onClick={handleApplyVoucher}
-                                disabled={voucherLoading}
-                                className="shrink-0 rounded-xl bg-[#1E1E1E] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#3A0810] disabled:cursor-not-allowed disabled:opacity-60"
+                    ) : vouchers.length === 0 ? (
+                        <div className="rounded-xl bg-[#F8F1E7] px-4 py-3 text-sm text-[#8C7777]">
+                            <p>Anda belum punya voucher untuk event ini.</p>
+                            <Link
+                                href="/customer/voucher"
+                                className="mt-1 inline-block font-semibold text-[#7A1F2B] hover:underline"
                             >
-                                {voucherLoading ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                    "Terapkan"
-                                )}
-                            </button>
+                                Punya kode? Tukar di halaman voucher
+                            </Link>
+                        </div>
+                    ) : (
+                        <div
+                            role="radiogroup"
+                            aria-label="Pilih voucher"
+                            className="max-h-72 space-y-2 overflow-y-auto"
+                        >
+                            {vouchers.map((voucher) => (
+                                <VoucherOption
+                                    key={voucher.id}
+                                    voucher={voucher}
+                                    selected={voucher.id === selectedVoucherId}
+                                    quantity={quantity}
+                                    onSelect={handleSelectVoucher}
+                                />
+                            ))}
                         </div>
                     )}
                 </div>
@@ -407,20 +558,35 @@ export default function CheckoutPage() {
 
                         {discount > 0 && (
                             <div className="flex justify-between text-[#1E7A4C]">
-                                <span>Diskon Voucher</span>
+                                <span>Diskon ({selectedVoucher?.promo_code})</span>
                                 <span>-{currency(discount)}</span>
+                            </div>
+                        )}
+
+                        {hasFeeEstimate && (
+                            <div className="flex justify-between text-[#8C7777]">
+                                <span>
+                                    Biaya Layanan ({formatPercent(feePercent)})
+                                </span>
+                                <span>{currency(serviceFee)}</span>
                             </div>
                         )}
                     </div>
 
                     <div className="mt-4 flex items-center justify-between border-t border-[#E5D6D0] pt-4">
                         <span className="font-semibold text-[#1E1E1E]">
-                            Total Bayar
+                            {hasFeeEstimate ? "Total Bayar" : "Total Tiket"}
                         </span>
                         <span className="text-xl font-bold text-[#5B0F18]">
-                            {currency(finalPrice)}
+                            {currency(grandTotal)}
                         </span>
                     </div>
+
+                    <p className="mt-2 text-xs text-[#8C7777]">
+                        {hasFeeEstimate
+                            ? "Perkiraan. Total final tampil di halaman pembayaran setelah order dibuat."
+                            : "Biaya layanan (jika ada) ditambahkan di halaman pembayaran."}
+                    </p>
                 </div>
 
                 {/* INFO */}
@@ -445,7 +611,7 @@ export default function CheckoutPage() {
                             Memproses...
                         </>
                     ) : (
-                        `Lanjutkan ke Pembayaran • ${currency(finalPrice)}`
+                        `Lanjutkan ke Pembayaran • ${currency(grandTotal)}`
                     )}
                 </button>
             </div>
@@ -463,7 +629,7 @@ export default function CheckoutPage() {
                             Memproses...
                         </>
                     ) : (
-                        `Bayar • ${currency(finalPrice)}`
+                        `Bayar`
                     )}
                 </button>
             </div>

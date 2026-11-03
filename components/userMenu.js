@@ -29,18 +29,13 @@ export default function UserMenu({
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
-  // Tentukan URL berdasarkan role
+  // Halaman profile bersifat universal untuk semua role (app/profile/page.js),
+  // jadi jangan diarahkan ke /admin/profile atau /customer/profile yang
+  // tidak ada halamannya.
   const getProfileUrl = () => {
     if (!user) return "/login";
-    
-    switch (user.role?.toLowerCase()) {
-      case "admin":
-        return "/admin/profile";
-      case "superadmin":
-        return "/admin/profile";
-      default:
-        return "/customer/profile";
-    }
+
+    return "/profile";
   };
 
   const getDashboardUrl = () => {
@@ -50,7 +45,7 @@ export default function UserMenu({
       case "admin":
         return "/admin/dashboard";
       case "superadmin":
-        return "/admin/dashboard";
+        return "/superadmin/dashboard";
       default:
         return "/customer/dashboard";
     }
@@ -62,6 +57,8 @@ export default function UserMenu({
     switch (user.role?.toLowerCase()) {
       case "admin":
         return "/admin/tickets";
+      case "superadmin":
+        return "/superadmin/dashboard";
       default:
         return "/customer/tickets";
     }
@@ -73,6 +70,8 @@ export default function UserMenu({
     switch (user.role?.toLowerCase()) {
       case "admin":
         return "/admin/notification";
+      case "superadmin":
+        return "/superadmin/notification";
       default:
         return "/customer/notification";
     }
@@ -231,25 +230,25 @@ export default function UserMenu({
                 </MenuItem>
               )}
 
-              {/* My Events - khusus customer */}
+              {/* Pesanan - khusus customer (PRD 25: menu "Pesanan") */}
               {user.role?.toLowerCase() === "customer" && (
                 <MenuItem 
-                  icon={CalendarDays} 
-                  href="/customer/events"
+                  icon={CreditCard} 
+                  href="/customer/orders"
                   onClick={() => setIsOpen(false)}
                 >
-                  My Events
+                  Pesanan
                 </MenuItem>
               )}
 
-              {/* Favorites - khusus customer */}
+              {/* Event - khusus customer */}
               {user.role?.toLowerCase() === "customer" && (
                 <MenuItem 
-                  icon={Heart} 
-                  href="/customer/favorites"
+                  icon={CalendarDays} 
+                  href="/customer/event"
                   onClick={() => setIsOpen(false)}
                 >
-                  Favorites
+                  Event
                 </MenuItem>
               )}
 
@@ -262,21 +261,10 @@ export default function UserMenu({
                 Notifications
               </MenuItem>
 
-              {/* Payment Methods - khusus customer */}
-              {user.role?.toLowerCase() === "customer" && (
-                <MenuItem 
-                  icon={CreditCard} 
-                  href="/customer/payments"
-                  onClick={() => setIsOpen(false)}
-                >
-                  Payment Methods
-                </MenuItem>
-              )}
-
-              {/* Settings */}
+              {/* Settings - halaman profile sudah mencakup edit profil */}
               <MenuItem 
                 icon={Settings} 
-                href={`${user.role?.toLowerCase() === "admin" ? "/admin" : "/customer"}/settings`}
+                href="/profile"
                 onClick={() => setIsOpen(false)}
               >
                 Settings

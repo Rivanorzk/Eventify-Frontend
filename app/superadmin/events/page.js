@@ -6,7 +6,7 @@ import Link from "next/link";
 import { CalendarDays, MapPin, Music, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
-import { deleteEvent, getEvents } from "@/services/eventService";
+import { deleteEvent, getEvents, updateEvent } from "@/services/eventService";
 import LoadingSpinner from "@/components/loadingSpinner";
 import EmptyState from "@/components/emptyState";
 import { currency, formatDate, formatTime } from "@/lib/formatter";
@@ -31,6 +31,8 @@ export default function SuperadminEventsPage() {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
     const [status, setStatus] = useState("all");
+
+    const [updatingId, setUpdatingId] = useState(null);
 
     const load = async () => {
         try {
@@ -62,6 +64,35 @@ export default function SuperadminEventsPage() {
             load();
         } catch (err) {
             toast.error(err.message || "Gagal menghapus event");
+        }
+    };
+
+    const handleStatusChange = async (event, nextStatus) => {
+        if (nextStatus === event.status) return;
+
+        const previousEvents = events;
+
+        setEvents((current) =>
+            current.map((item) =>
+                item.id === event.id
+                    ? { ...item, status: nextStatus }
+                    : item
+            )
+        );
+
+        setUpdatingId(event.id);
+
+        try {
+            const formData = new FormData();
+            formData.append("status", nextStatus);
+
+            await updateEvent(event.id, formData);
+            toast.success(`Status event diubah menjadi ${nextStatus}`);
+        } catch (err) {
+            toast.error(err.message || "Gagal mengubah status event");
+            setEvents(previousEvents);
+        } finally {
+            setUpdatingId(null);
         }
     };
 
@@ -141,13 +172,24 @@ export default function SuperadminEventsPage() {
                             <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-2">
                                     <h3 className="truncate font-bold text-[#1E1E1E]">{event.title}</h3>
-                                    <span
-                                        className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                    <select
+                                        value={event.status}
+                                        disabled={updatingId === event.id}
+                                        onChange={(e) =>
+                                            handleStatusChange(event, e.target.value)
+                                        }
+                                        className={`shrink-0 rounded-full border-0 px-2.5 py-0.5 text-xs font-semibold outline-none focus:ring-2 focus:ring-[#7A1F2B]/30 disabled:opacity-50 ${
                                             STATUS_BADGES[event.status] || "bg-[#F8F1E7] text-[#8C7777]"
                                         }`}
                                     >
-                                        {event.status}
-                                    </span>
+                                        {STATUS_OPTIONS.filter((opt) => opt.value !== "all").map(
+                                            (opt) => (
+                                                <option key={opt.value} value={opt.value}>
+                                                    {opt.label}
+                                                </option>
+                                            )
+                                        )}
+                                    </select>
                                 </div>
                                 <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#8C7777]">
                                     <span className="flex items-center gap-1">

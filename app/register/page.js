@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 
 import AuthLogo from "@/components/authLogo";
-import AuthInput from "@/components/authInput";
 import useAuth from "@/hooks/useAuth";
 import { register as registerService } from "@/services/authService";
 
@@ -36,6 +35,70 @@ function getPasswordStrength(password) {
   if (/[0-9]/.test(password)) score++;
   if (/[^A-Za-z0-9]/.test(password)) score++;
   return Math.min(score, 4);
+}
+
+/* ---------------------------------------------------------
+   INPUT FIELD (manual)
+--------------------------------------------------------- */
+function InputField({
+  id,
+  name,
+  type = "text",
+  label,
+  placeholder,
+  icon: Icon,
+  value,
+  onChange,
+  onFocus,
+  onBlur,
+  autoComplete,
+  disabled,
+  rightElement,
+  focused,
+}) {
+  return (
+    <div className="w-full">
+      <label
+        htmlFor={id}
+        className="mb-1 block text-[11px] font-semibold text-[#1E1E1E]/80"
+      >
+        {label}
+      </label>
+      <div
+        className={`relative flex items-center gap-2 rounded-lg border bg-white px-3.5 py-2.5 transition-all duration-300 ${
+          focused
+            ? "border-transparent ring-2 ring-[#D4A537]"
+            : "border-[#E5D6D0]"
+        } ${disabled ? "opacity-60" : ""}`}
+      >
+        {Icon && (
+          <Icon
+            className={`h-4 w-4 flex-shrink-0 transition-colors ${
+              focused ? "text-[#7A1F2B]" : "text-[#A68C8C]"
+            }`}
+          />
+        )}
+        <input
+          id={id}
+          name={name}
+          type={type}
+          value={value}
+          onChange={onChange}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          autoComplete={autoComplete}
+          disabled={disabled}
+          placeholder={placeholder}
+          className="w-full min-w-0 bg-transparent text-sm font-medium text-[#1E1E1E] outline-none placeholder:text-[#1E1E1E]/30"
+        />
+        {rightElement && (
+          <div className="flex flex-shrink-0 items-center gap-1.5">
+            {rightElement}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function RegisterPage() {
@@ -62,11 +125,9 @@ export default function RegisterPage() {
   const [passwordValid, setPasswordValid] = useState(null);
   const [confirmValid, setConfirmValid] = useState(null);
 
-  // ... setelah state lainnya
   const [dots, setDots] = useState([]);
 
   useEffect(() => {
-    // Hanya berjalan di klien
     const newDots = Array.from({ length: 20 }, () => ({
       left: Math.random() * 100,
       top: Math.random() * 100,
@@ -82,7 +143,6 @@ export default function RegisterPage() {
     setIsVisible(true);
   }, []);
 
-  // Spotlight interaktif yang mengikuti kursor di sisi branding
   const brandRef = useRef(null);
   const [spot, setSpot] = useState({ x: 50, y: 50 });
   const handleBrandMouseMove = (e) => {
@@ -189,7 +249,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <main className="relative h-screen w-screen overflow-hidden bg-[#F8F1E7]">
+    <main className="relative h-screen w-full overflow-hidden bg-[#F8F1E7]">
       {/* Background dekoratif dinamis */}
       <div className="absolute inset-0 -z-10 bg-gradient-to-br from-[#F8F1E7] via-[#F1E4DA] to-[#E8D5CC]" />
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_bottom_right,_#D8A7A7_0%,_transparent_60%)] opacity-40" />
@@ -200,7 +260,7 @@ export default function RegisterPage() {
       <div className="absolute left-1/2 top-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#7A1F2B]/5 blur-3xl animate-pulse delay-700" />
 
       <div
-        className={`grid h-full w-full grid-cols-1 lg:grid-cols-2 transition-all duration-700 ${
+        className={`grid h-full w-full grid-cols-1 overflow-x-hidden lg:grid-cols-2 transition-all duration-700 ${
           isVisible ? "opacity-100" : "opacity-0"
         }`}
       >
@@ -208,7 +268,7 @@ export default function RegisterPage() {
         <section
           ref={brandRef}
           onMouseMove={handleBrandMouseMove}
-          className="relative hidden h-full flex-col justify-between overflow-hidden bg-gradient-to-br from-[#5B0F18] via-[#7A1F2B] to-[#3A0810] p-10 text-[#F8F1E7] lg:flex xl:p-14"
+          className="relative hidden h-full min-w-0 flex-col justify-between overflow-hidden bg-gradient-to-br from-[#5B0F18] via-[#7A1F2B] to-[#3A0810] p-12 text-[#F8F1E7] lg:flex xl:p-16"
         >
           <div
             className="pointer-events-none absolute inset-0 transition-opacity duration-300"
@@ -217,8 +277,8 @@ export default function RegisterPage() {
             }}
           />
 
-          <div className="absolute -right-12 -top-12 h-48 w-48 rounded-full bg-[#D4A537]/10 blur-2xl animate-spin-slow" />
-          <div className="absolute -bottom-12 -left-12 h-56 w-56 rounded-full bg-[#D8A7A7]/10 blur-2xl animate-spin-slower" />
+          <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-[#D4A537]/10 blur-2xl animate-spin-slow" />
+          <div className="absolute -bottom-16 -left-16 h-72 w-72 rounded-full bg-[#D8A7A7]/10 blur-2xl animate-spin-slower" />
 
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
             {dots.map((dot, i) => (
@@ -237,15 +297,15 @@ export default function RegisterPage() {
           </div>
 
           <div className="relative z-10">
-            <AuthLogo dark />
+            <AuthLogo dark size="lg" />
           </div>
 
-          <div className="relative z-10 max-w-sm animate-fade-up">
-            <span className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-[#D8A7A7]/20 bg-[#D8A7A7]/10 px-3 py-1 text-xs font-medium backdrop-blur-sm">
-              <Sparkles className="h-3 w-3" />
+          <div className="relative z-10 max-w-md animate-fade-up">
+            <span className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-[#D8A7A7]/20 bg-[#D8A7A7]/10 px-4 py-1.5 text-sm font-medium backdrop-blur-sm">
+              <Sparkles className="h-3.5 w-3.5" />
               Your events, your experience.
             </span>
-            <h1 className="text-3xl font-bold leading-tight tracking-tight">
+            <h1 className="text-4xl xl:text-5xl font-bold leading-[1.1] tracking-tight">
               {["Your next", "experience", "starts here."].map((line, idx) => (
                 <span
                   key={idx}
@@ -256,11 +316,11 @@ export default function RegisterPage() {
                 </span>
               ))}
             </h1>
-            <p className="mt-3 text-sm text-[#D8A7A7] leading-relaxed">
-              Buat akun Eventify dan mulai temukan berbagai
-              event menarik yang sesuai dengan minatmu.
+            <p className="mt-4 text-base text-[#D8A7A7] leading-relaxed">
+              Buat akun Eventify dan mulai temukan berbagai event menarik
+              yang sesuai dengan minatmu.
             </p>
-            <div className="mt-5 space-y-2">
+            <div className="mt-6 space-y-3">
               {[
                 { icon: CalendarDays, text: "Temukan event favoritmu" },
                 { icon: ShieldCheck, text: "Pesan tiket dengan mudah" },
@@ -268,57 +328,60 @@ export default function RegisterPage() {
               ].map((item, idx) => (
                 <div
                   key={idx}
-                  className="group flex items-center gap-2.5 transition-transform duration-300 hover:translate-x-1.5"
+                  className="group flex items-center gap-3 transition-transform duration-300 hover:translate-x-1.5"
                 >
-                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#D8A7A7]/15 transition-colors duration-300 group-hover:bg-[#D4A537]/25">
-                    <item.icon className="h-3.5 w-3.5" />
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#D8A7A7]/15 transition-colors duration-300 group-hover:bg-[#D4A537]/25">
+                    <item.icon className="h-4 w-4" />
                   </div>
-                  <span className="text-xs text-[#F8F1E7]/90">{item.text}</span>
+                  <span className="text-sm text-[#F8F1E7]/90">{item.text}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="relative z-10 flex items-center gap-2 text-xs text-[#D8A7A7] animate-fade-up">
-            <div className="flex -space-x-1.5">
-              <div className="h-6 w-6 rounded-full border-2 border-[#5B0F18] bg-[#D8A7A7] transition-transform duration-300 hover:z-10 hover:scale-110" />
-              <div className="h-6 w-6 rounded-full border-2 border-[#5B0F18] bg-[#7A1F2B] transition-transform duration-300 hover:z-10 hover:scale-110" />
-              <div className="h-6 w-6 rounded-full border-2 border-[#5B0F18] bg-[#F8F1E7] transition-transform duration-300 hover:z-10 hover:scale-110" />
+          <div className="relative z-10 flex items-center gap-3 text-sm text-[#D8A7A7] animate-fade-up">
+            <div className="flex -space-x-2">
+              <div className="h-7 w-7 rounded-full border-2 border-[#5B0F18] bg-[#D8A7A7] transition-transform duration-300 hover:z-10 hover:scale-110" />
+              <div className="h-7 w-7 rounded-full border-2 border-[#5B0F18] bg-[#7A1F2B] transition-transform duration-300 hover:z-10 hover:scale-110" />
+              <div className="h-7 w-7 rounded-full border-2 border-[#5B0F18] bg-[#F8F1E7] transition-transform duration-300 hover:z-10 hover:scale-110" />
             </div>
             <span>Join thousands of event enthusiasts</span>
           </div>
         </section>
 
-        {/* SISI KANAN - Form, fullscreen, scrollable jika perlu */}
-        <section className="flex h-full items-center justify-center overflow-y-auto bg-white/40 px-6 py-8 backdrop-blur-sm sm:px-10 lg:px-14 xl:px-20">
+        {/* SISI KANAN - Form (diperkecil agar tidak overflow) */}
+        <section className="flex h-full min-w-0 items-center justify-center overflow-y-auto overflow-x-hidden bg-white/40 px-5 py-6 backdrop-blur-sm sm:px-8 lg:px-12 xl:px-16">
           <div className="w-full max-w-sm">
-            <div className="mb-4 flex justify-center lg:hidden animate-fade-up">
+            <div className="mb-6 flex justify-center lg:hidden animate-fade-up">
               <AuthLogo />
             </div>
 
-            <div className="mb-4 animate-fade-up">
+            <div className="mb-5 animate-fade-up">
               <h2 className="text-2xl font-bold text-[#1E1E1E] tracking-tight">
                 Create your account
               </h2>
-              <p className="text-xs text-[#737373]">
+              <p className="mt-1 text-xs text-[#737373]">
                 Start your journey with Eventify today.
               </p>
             </div>
 
             <div
               className={`transition-all duration-300 overflow-hidden ${
-                error ? "max-h-20 mb-3 opacity-100" : "max-h-0 mb-0 opacity-0"
+                error ? "max-h-24 mb-3 opacity-100" : "max-h-0 mb-0 opacity-0"
               }`}
             >
-              <div className="flex items-start gap-2 rounded-lg border border-[#E8B8B8] bg-[#FFF4F4] px-3 py-2 animate-shake">
+              <div className="flex items-start gap-2.5 rounded-lg border border-[#E8B8B8] bg-[#FFF4F4] px-3 py-2.5 animate-shake">
                 <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#7A1F2B]" />
-                <p className="text-xs text-[#7A1F2B] leading-relaxed">{error}</p>
+                <p className="text-[11px] text-[#7A1F2B] leading-relaxed">
+                  {error}
+                </p>
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-2.5">
+            <form onSubmit={handleSubmit} className="space-y-3">
+              {/* username */}
               <div className="animate-fade-up" style={{ animationDelay: "60ms" }}>
-                <AuthInput
+                <InputField
                   id="username"
                   name="username"
                   type="text"
@@ -331,25 +394,25 @@ export default function RegisterPage() {
                   onBlur={() => setFocusedField(null)}
                   autoComplete="username"
                   disabled={loading}
-                  className={`transition-all duration-300 focus-within:ring-2 focus-within:ring-[#D4A537] focus-within:border-transparent ${
-                    focusedField === "username" ? "scale-[1.01]" : ""
-                  }`}
+                  focused={focusedField === "username"}
                   rightElement={
-                    usernameValid !== null && form.username.length > 0 && (
-                      <div className="flex items-center">
+                    usernameValid !== null &&
+                    form.username.length > 0 && (
+                      <>
                         {usernameValid ? (
-                          <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                          <CheckCircle2 className="h-4 w-4 text-green-500" />
                         ) : (
-                          <XCircle className="h-3.5 w-3.5 text-red-400" />
+                          <XCircle className="h-4 w-4 text-red-400" />
                         )}
-                      </div>
+                      </>
                     )
                   }
                 />
               </div>
 
+              {/* email */}
               <div className="animate-fade-up" style={{ animationDelay: "100ms" }}>
-                <AuthInput
+                <InputField
                   id="email"
                   name="email"
                   type="email"
@@ -362,25 +425,25 @@ export default function RegisterPage() {
                   onBlur={() => setFocusedField(null)}
                   autoComplete="email"
                   disabled={loading}
-                  className={`transition-all duration-300 focus-within:ring-2 focus-within:ring-[#D4A537] focus-within:border-transparent ${
-                    focusedField === "email" ? "scale-[1.01]" : ""
-                  }`}
+                  focused={focusedField === "email"}
                   rightElement={
-                    emailValid !== null && form.email.length > 0 && (
-                      <div className="flex items-center">
+                    emailValid !== null &&
+                    form.email.length > 0 && (
+                      <>
                         {emailValid ? (
-                          <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                          <CheckCircle2 className="h-4 w-4 text-green-500" />
                         ) : (
-                          <XCircle className="h-3.5 w-3.5 text-red-400" />
+                          <XCircle className="h-4 w-4 text-red-400" />
                         )}
-                      </div>
+                      </>
                     )
                   }
                 />
               </div>
 
+              {/* phone */}
               <div className="animate-fade-up" style={{ animationDelay: "140ms" }}>
-                <AuthInput
+                <InputField
                   id="phone"
                   name="phone"
                   type="tel"
@@ -393,25 +456,25 @@ export default function RegisterPage() {
                   onBlur={() => setFocusedField(null)}
                   autoComplete="tel"
                   disabled={loading}
-                  className={`transition-all duration-300 focus-within:ring-2 focus-within:ring-[#D4A537] focus-within:border-transparent ${
-                    focusedField === "phone" ? "scale-[1.01]" : ""
-                  }`}
+                  focused={focusedField === "phone"}
                   rightElement={
-                    phoneValid !== null && form.phone.length > 0 && (
-                      <div className="flex items-center">
+                    phoneValid !== null &&
+                    form.phone.length > 0 && (
+                      <>
                         {phoneValid ? (
-                          <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                          <CheckCircle2 className="h-4 w-4 text-green-500" />
                         ) : (
-                          <XCircle className="h-3.5 w-3.5 text-red-400" />
+                          <XCircle className="h-4 w-4 text-red-400" />
                         )}
-                      </div>
+                      </>
                     )
                   }
                 />
               </div>
 
+              {/* password */}
               <div className="animate-fade-up" style={{ animationDelay: "180ms" }}>
-                <AuthInput
+                <InputField
                   id="password"
                   name="password"
                   type={showPassword ? "text" : "password"}
@@ -424,19 +487,17 @@ export default function RegisterPage() {
                   onBlur={() => setFocusedField(null)}
                   autoComplete="new-password"
                   disabled={loading}
-                  className={`transition-all duration-300 focus-within:ring-2 focus-within:ring-[#D4A537] focus-within:border-transparent ${
-                    focusedField === "password" ? "scale-[1.01]" : ""
-                  }`}
+                  focused={focusedField === "password"}
                   rightElement={
                     <>
                       {passwordValid !== null && form.password.length > 0 && (
-                        <div className="mr-1 flex items-center">
+                        <>
                           {passwordValid ? (
-                            <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                            <CheckCircle2 className="h-4 w-4 text-green-500" />
                           ) : (
-                            <XCircle className="h-3.5 w-3.5 text-red-400" />
+                            <XCircle className="h-4 w-4 text-red-400" />
                           )}
-                        </div>
+                        </>
                       )}
                       <button
                         type="button"
@@ -444,18 +505,18 @@ export default function RegisterPage() {
                         className="text-[#A68C8C] transition-all duration-200 hover:text-[#5B0F18] hover:scale-110"
                       >
                         {showPassword ? (
-                          <EyeOff className="h-3.5 w-3.5" />
+                          <EyeOff className="h-4 w-4" />
                         ) : (
-                          <Eye className="h-3.5 w-3.5" />
+                          <Eye className="h-4 w-4" />
                         )}
                       </button>
                     </>
                   }
                 />
 
-                {/* Indikator kekuatan password, dinamis mengikuti input */}
+                {/* Indikator kekuatan password */}
                 <div
-                  className={`mt-1 flex items-center gap-1.5 overflow-hidden transition-all duration-300 ${
+                  className={`mt-1.5 flex items-center gap-2 overflow-hidden transition-all duration-300 ${
                     form.password.length > 0
                       ? "max-h-6 opacity-100"
                       : "max-h-0 opacity-0"
@@ -468,15 +529,13 @@ export default function RegisterPage() {
                         className="h-1 flex-1 rounded-full bg-[#E5D6D0] transition-colors duration-300"
                         style={{
                           backgroundColor:
-                            i < strength
-                              ? STRENGTH_COLORS[strength]
-                              : "#E5D6D0",
+                            i < strength ? STRENGTH_COLORS[strength] : "#E5D6D0",
                         }}
                       />
                     ))}
                   </div>
                   <span
-                    className="text-[9px] font-medium transition-colors duration-300"
+                    className="text-[10px] font-medium transition-colors duration-300"
                     style={{ color: STRENGTH_COLORS[strength] }}
                   >
                     {STRENGTH_LABELS[strength]}
@@ -484,8 +543,9 @@ export default function RegisterPage() {
                 </div>
               </div>
 
+              {/* confirm password */}
               <div className="animate-fade-up" style={{ animationDelay: "220ms" }}>
-                <AuthInput
+                <InputField
                   id="confirmPassword"
                   name="confirmPassword"
                   type={showConfirm ? "text" : "password"}
@@ -498,20 +558,18 @@ export default function RegisterPage() {
                   onBlur={() => setFocusedField(null)}
                   autoComplete="new-password"
                   disabled={loading}
-                  className={`transition-all duration-300 focus-within:ring-2 focus-within:ring-[#D4A537] focus-within:border-transparent ${
-                    focusedField === "confirmPassword" ? "scale-[1.01]" : ""
-                  }`}
+                  focused={focusedField === "confirmPassword"}
                   rightElement={
                     <>
                       {confirmValid !== null &&
                         form.confirmPassword.length > 0 && (
-                          <div className="mr-1 flex items-center">
+                          <>
                             {confirmValid ? (
-                              <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                              <CheckCircle2 className="h-4 w-4 text-green-500" />
                             ) : (
-                              <XCircle className="h-3.5 w-3.5 text-red-400" />
+                              <XCircle className="h-4 w-4 text-red-400" />
                             )}
-                          </div>
+                          </>
                         )}
                       <button
                         type="button"
@@ -519,9 +577,9 @@ export default function RegisterPage() {
                         className="text-[#A68C8C] transition-all duration-200 hover:text-[#5B0F18] hover:scale-110"
                       >
                         {showConfirm ? (
-                          <EyeOff className="h-3.5 w-3.5" />
+                          <EyeOff className="h-4 w-4" />
                         ) : (
-                          <Eye className="h-3.5 w-3.5" />
+                          <Eye className="h-4 w-4" />
                         )}
                       </button>
                     </>
@@ -529,18 +587,19 @@ export default function RegisterPage() {
                 />
               </div>
 
-              <div className="flex items-start gap-1.5 pt-0.5">
+              {/* terms */}
+              <div className="flex items-start gap-2 pt-0.5">
                 <input
                   id="terms"
                   type="checkbox"
                   checked={agreeTerms}
                   onChange={(e) => setAgreeTerms(e.target.checked)}
                   disabled={loading}
-                  className="mt-0.5 h-3 w-3 shrink-0 rounded border-[#D8A7A7] accent-[#7A1F2B] transition-all duration-200 hover:scale-110"
+                  className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-[#D8A7A7] accent-[#7A1F2B] transition-all duration-200 hover:scale-110"
                 />
                 <label
                   htmlFor="terms"
-                  className="cursor-pointer text-[8px] leading-relaxed text-[#737373] transition hover:text-[#1E1E1E]"
+                  className="cursor-pointer text-[11px] leading-relaxed text-[#737373] transition hover:text-[#1E1E1E]"
                 >
                   I agree to Eventify's{" "}
                   <Link
@@ -560,28 +619,29 @@ export default function RegisterPage() {
                 </label>
               </div>
 
+              {/* submit */}
               <button
                 type="submit"
                 disabled={loading}
-                className="group relative flex h-9 w-full items-center justify-center gap-1.5 overflow-hidden rounded-lg bg-[#5B0F18] text-[11px] font-semibold text-[#F8F1E7] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#7A1F2B] hover:shadow-lg hover:shadow-[#5B0F18]/20 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                className="group relative flex h-10 w-full items-center justify-center gap-2 overflow-hidden rounded-lg bg-[#5B0F18] text-sm font-semibold text-[#F8F1E7] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#7A1F2B] hover:shadow-xl hover:shadow-[#5B0F18]/20 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0"
               >
                 {loading ? (
                   <>
-                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-[#F8F1E7]/30 border-t-[#F8F1E7]" />
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#F8F1E7]/30 border-t-[#F8F1E7]" />
                     Creating...
                   </>
                 ) : (
                   <>
                     Create account
-                    <ArrowRight className="h-3 w-3 transition-transform duration-300 group-hover:translate-x-1" />
+                    <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
                   </>
                 )}
                 <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent group-hover:animate-shimmer" />
               </button>
             </form>
 
-            <div className="mt-3 text-center">
-              <p className="text-[10px] text-[#737373]">
+            <div className="mt-4 text-center">
+              <p className="text-[11px] text-[#737373]">
                 Sudah memiliki akun?{" "}
                 <Link
                   href="/login"
@@ -592,7 +652,7 @@ export default function RegisterPage() {
               </p>
             </div>
 
-            <p className="mt-2 text-center text-[8px] leading-relaxed text-[#A68C8C]">
+            <p className="mt-2.5 text-center text-[10px] leading-relaxed text-[#A68C8C]">
               By creating an account, you agree to Eventify's{" "}
               <Link
                 href="/terms"

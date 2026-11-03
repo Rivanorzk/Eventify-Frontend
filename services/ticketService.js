@@ -21,3 +21,20 @@ export const getTicketById = async (id) => {
 
     return response.data.data;
 };
+ 
+export async function createTicketCategory(payload) {
+    // payload: { event_id, name, price, quota, description, is_active }
+    const res = await api.post("/event-ticket-categories", payload);
+    return res.data.data;
+}
+ 
+export async function updateTicketCategory(id, payload) {
+    // payload: { name, price, quota, description, is_active }
+    const res = await api.put(`/event-ticket-categories/${id}`, payload);
+    return res.data.data;
+}
+ 
+export async function deleteTicketCategory(id) {
+    const res = await api.delete(`/event-ticket-categories/${id}`);
+    return res.data;
+}

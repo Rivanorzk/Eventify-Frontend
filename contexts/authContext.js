@@ -8,7 +8,7 @@ import {
     useState,
 } from "react";
 
-import { getMe } from "@/services/authService";
+import { getMe, logout as logoutApi } from "@/services/authService";
 
 import {
     getToken,
@@ -49,14 +49,13 @@ export function AuthProvider({ children }) {
 
             return userData;
         } catch (error) {
-            console.error(
-                "Auth verification failed:",
-                error
-            );
+            // 401 = token invalid/expired, itu kondisi normal, bukan error aplikasi
+            if (error?.response?.status !== 401) {
+                console.error("Auth verification failed:", error);
+            }
 
             removeToken();
             setUser(null);
-
             return null;
         } finally {
             setLoading(false);
@@ -66,6 +65,17 @@ export function AuthProvider({ children }) {
     useEffect(() => {
         fetchUser();
     }, [fetchUser]);
+
+        // Heartbeat: jaga status online selama user membuka aplikasi.
+    useEffect(() => {
+        if (!user) return;
+
+        const id = setInterval(() => {
+            getMe().catch(() => {});
+        }, 2 * 60 * 1000);
+
+        return () => clearInterval(id);
+    }, [user]);
 
     const login = async (
         token,
@@ -83,10 +93,16 @@ export function AuthProvider({ children }) {
         return await fetchUser();
     };
 
-    const logout = () => {
-        removeToken();
-        setUser(null);
-        setLoading(false);
+    const logout = async () => {
+        try {
+            // Beritahu backend (status -> offline) selagi token masih ada.
+            // logoutApi menelan error-nya sendiri, jadi tidak akan melempar.
+            await logoutApi();
+        } finally {
+            removeToken();
+            setUser(null);
+            setLoading(false);
+        }
     };
 
     const refreshUser = async () => {

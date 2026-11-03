@@ -46,3 +46,8 @@ export const getByEvent = async (eventId) => {
     const { data } = await api.get(`/event-ticket-categories/event/${eventId}`);
     return data.data;
 };
+
+export const getEventTicketCategoryDetail = async (id) => {
+    const { data } = await api.get(`/event-ticket-categories/${id}/detail`);
+    return data.data; // { ...category, areas, benefits, rules }
+};

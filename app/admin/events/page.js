@@ -13,12 +13,16 @@ import {
     Eye,
 } from "lucide-react";
 
-import { getEvents, deleteEvent } from "@/services/eventService";
+import { getEvents, updateEvent, deleteEvent } from "@/services/eventService";
+
+const STATUS_OPTIONS = ["all", "draft", "published", "finished", "cancelled"];
 
 export default function AdminEventsPage() {
     const [events, setEvents] = useState([]);
     const [search, setSearch] = useState("");
+    const [statusFilter, setStatusFilter] = useState("all");
     const [loading, setLoading] = useState(true);
+    const [updatingId, setUpdatingId] = useState(null);
 
     const loadEvents = async () => {
         try {
@@ -41,11 +45,16 @@ export default function AdminEventsPage() {
         loadEvents();
     }, []);
 
-    const filteredEvents = events.filter((event) =>
-        event.title
+    const filteredEvents = events.filter((event) => {
+        const matchesSearch = event.title
             ?.toLowerCase()
-            .includes(search.toLowerCase())
-    );
+            .includes(search.toLowerCase());
+
+        const matchesStatus =
+            statusFilter === "all" || event.status === statusFilter;
+
+        return matchesSearch && matchesStatus;
+    });
 
     const handleDelete = async (id) => {
         const confirmed = window.confirm(
@@ -63,6 +72,34 @@ export default function AdminEventsPage() {
         } catch (error) {
             console.error("Failed to delete event:", error);
             alert("Failed to delete event.");
+        }
+    };
+
+    const handleStatusChange = async (id, nextStatus) => {
+        const previousEvents = events;
+
+        // Optimistic update supaya terasa instan, di-rollback kalau gagal.
+        setEvents((current) =>
+            current.map((event) =>
+                event.id === id
+                    ? { ...event, status: nextStatus }
+                    : event
+            )
+        );
+
+        setUpdatingId(id);
+
+        try {
+            const formData = new FormData();
+            formData.append("status", nextStatus);
+
+            await updateEvent(id, formData);
+        } catch (error) {
+            console.error("Failed to update event status:", error);
+            alert("Gagal mengubah status event.");
+            setEvents(previousEvents);
+        } finally {
+            setUpdatingId(null);
         }
     };
 
@@ -132,7 +169,7 @@ const formatEventTime = (time) => {
 
                 <div className="bg-white border border-[#E5D6D0] rounded-2xl overflow-hidden text-black">
 
-                    <div className="p-5 border-b border-[#E5D6D0]">
+                    <div className="p-5 border-b border-[#E5D6D0] flex flex-col gap-4">
                         <div className="relative max-w-md">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A78E8E]" />
 
@@ -145,6 +182,23 @@ const formatEventTime = (time) => {
                                 placeholder="Search events..."
                                 className="w-full rounded-xl border border-[#E5D6D0] bg-[#FCF9F5] py-3 pl-10 pr-4 text-sm outline-none focus:border-[#7A1F2B]"
                             />
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                            {STATUS_OPTIONS.map((option) => (
+                                <button
+                                    key={option}
+                                    type="button"
+                                    onClick={() => setStatusFilter(option)}
+                                    className={`rounded-full px-4 py-1.5 text-xs font-semibold capitalize transition ${
+                                        statusFilter === option
+                                            ? "bg-[#7A1F2B] text-white"
+                                            : "bg-[#F8F1E7] text-[#7A1F2B] hover:bg-[#F0E5DE]"
+                                    }`}
+                                >
+                                    {option}
+                                </button>
+                            ))}
                         </div>
                     </div>
 
@@ -248,15 +302,33 @@ const formatEventTime = (time) => {
                                                 </div>
                                             </td>
                                             <td className="px-5 py-4">
-                                                <span className={`inline-flex rounded-full px-3 py-1 text-[11px] font-semibold ${
-                                                    event.status === "published"
-                                                        ? "bg-green-50 text-green-700"
-                                                        : event.status === "cancelled"
-                                                        ? "bg-red-50 text-red-700"
-                                                        : "bg-[#F8F1E7] text-[#7A1F2B]"
-                                                }`}>
-                                                    {event.status || "draft"}
-                                                </span>
+                                                <select
+                                                    value={event.status || "draft"}
+                                                    disabled={updatingId === event.id}
+                                                    onChange={(e) =>
+                                                        handleStatusChange(
+                                                            event.id,
+                                                            e.target.value
+                                                        )
+                                                    }
+                                                    className={`rounded-full border-0 px-3 py-1 text-[11px] font-semibold capitalize outline-none focus:ring-2 focus:ring-[#7A1F2B]/30 disabled:opacity-50 ${
+                                                        event.status === "published"
+                                                            ? "bg-green-50 text-green-700"
+                                                            : event.status === "cancelled"
+                                                            ? "bg-red-50 text-red-700"
+                                                            : event.status === "finished"
+                                                            ? "bg-blue-50 text-blue-700"
+                                                            : "bg-[#F8F1E7] text-[#7A1F2B]"
+                                                    }`}
+                                                >
+                                                    {STATUS_OPTIONS.filter(
+                                                        (option) => option !== "all"
+                                                    ).map((option) => (
+                                                        <option key={option} value={option}>
+                                                            {option}
+                                                        </option>
+                                                    ))}
+                                                </select>
                                             </td>
 
                                             <td className="px-5 py-4">

@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    allowedDevOrigins: [
+        'bullseye-attribute-glacier.ngrok-free.dev'],
     images: {
         remotePatterns: [
             {

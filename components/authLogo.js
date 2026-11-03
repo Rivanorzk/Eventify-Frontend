@@ -1,36 +1,33 @@
+import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays } from "lucide-react";
 
-export default function AuthLogo({
-  dark = false,
-}) {
+export default function AuthLogo({ dark = false, size = "md" }) {
+  const logoSizes = {
+    sm: "h-8 w-8",
+    md: "h-12 w-12",
+    lg: "h-16 w-16",
+  };
+  const textSizes = {
+    sm: "text-lg",
+    md: "text-xl",
+    lg: "text-2xl",
+  };
+
   return (
-    <Link
-      href="/"
-      className="inline-flex items-center gap-3"
-    >
-      <div
-        className={`w-11 h-11 rounded-xl flex items-center justify-center ${
-          dark
-            ? "bg-[#F8F1E7]"
-            : "bg-[#5B0F18]"
-        }`}
-      >
-        <CalendarDays
-          className={`w-6 h-6 ${
-            dark
-              ? "text-[#5B0F18]"
-              : "text-[#F8F1E7]"
-          }`}
-        />
-      </div>
-
+    <Link href="/" className="flex items-center">
+      <Image
+        src="/Eventify.png"
+        alt="Logo Eventify"
+        width={48}
+        height={48}
+        className={`${logoSizes[size]} object-contain -mr-3`}
+        priority
+      />
       <span
-        className={`text-2xl font-bold tracking-tight ${
-          dark
-            ? "text-[#F8F1E7]"
-            : "text-[#1E1E1E]"
+        className={`font-bold uppercase tracking-tight ${textSizes[size]} ${
+          dark ? "text-[#F8F1E7]" : "text-[#5B0F18]"
         }`}
+        style={{ fontFamily: "var(--font-display, inherit)" }}
       >
         Eventify
       </span>

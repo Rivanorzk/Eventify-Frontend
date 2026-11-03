@@ -21,7 +21,7 @@ export default function CreateVoucherPage() {
         minimum_ticket: 1,
         discount_type: "percentage",
         discount_value: "",
-        quota: 0,
+        quota: 1,
         start_date: "",
         end_date: "",
     });
@@ -105,8 +105,8 @@ export default function CreateVoucherPage() {
             return;
         }
 
-        if (Number(form.quota) < 0) {
-            setError("Quota cannot be negative.");
+        if (Number(form.quota) < 1) {
+            setError("Quota cannot be less than 1.");
             return;
         }
 
@@ -130,12 +130,12 @@ export default function CreateVoucherPage() {
                 event_id: Number(form.event_id),
                 title: form.title.trim(),
                 promo_code: form.promo_code.trim(),
-                minimum_ticket: Number(form.minimum_ticket),
+                minimum_quantity: Number(form.minimum_ticket),
                 discount_type: form.discount_type,
                 discount_value: Number(form.discount_value),
                 quota: Number(form.quota),
-                start_date: form.start_date,
-                end_date: form.end_date,
+                start_date: new Date(form.start_date).toISOString(),
+                end_date: new Date(form.end_date).toISOString(),
             });
 
             router.push("/admin/vouchers");

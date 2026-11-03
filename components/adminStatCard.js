@@ -3,6 +3,9 @@ import {
     ShoppingBag,
     Users,
     Ticket,
+    Wallet,
+    CheckCircle2,
+    ShieldCheck,
 } from "lucide-react";
 
 const icons = {
@@ -10,6 +13,9 @@ const icons = {
     orders: ShoppingBag,
     customers: Users,
     tickets: Ticket,
+    revenue: Wallet,
+    success: CheckCircle2,
+    admins: ShieldCheck,
 };
 
 export default function AdminStatCard({

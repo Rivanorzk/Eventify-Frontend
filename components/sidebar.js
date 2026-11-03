@@ -1,13 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import * as Icons from "lucide-react";
-import {
-    CalendarDays,
-    User,
-    LogOut,
-} from "lucide-react";
+import { LogOut } from "lucide-react";
 
 import useAuth from "@/hooks/useAuth";
 import { menus } from "@/constants/menu";
@@ -16,6 +14,22 @@ export default function Sidebar() {
     const pathname = usePathname();
     const router = useRouter();
     const { user, logout } = useAuth();
+    const [loggingOut, setLoggingOut] = useState(false);
+
+    const handleLogout = async () => {
+        if (loggingOut) return;
+        setLoggingOut(true);
+
+        try {
+            await logout();
+        } catch (error) {
+            console.error("Logout error:", error);
+        } finally {
+            router.replace("/login");
+            router.refresh();
+            setLoggingOut(false);
+        }
+    };  
 
     const role = user?.role?.toLowerCase();
 
@@ -23,6 +37,18 @@ export default function Sidebar() {
         menus[role] ||
         menus[role?.toUpperCase()] ||
         [];
+
+    /* ---------------------------------------------------------
+       SUBTITLE sesuai role
+    --------------------------------------------------------- */
+    const roleSubtitle =
+        role === "customer"
+            ? "Customer"
+            : role === "admin"
+            ? "Admin Panel"
+            : role === "superadmin"
+            ? "Superadmin Panel"
+            : "";
 
     const normalizePath = (path) => {
         if (!path) return "/";
@@ -61,36 +87,33 @@ export default function Sidebar() {
             );
         });
 
-    const handleLogout = async () => {
-        await logout();
-        router.replace("/login");
-    };
-
     return (
         <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 z-40 w-[250px] bg-[#5B0F18] text-[#F8F1E7] flex-col px-5 py-6">
 
-            {/* LOGO */}
-            <Link
-                href="/"
-                className="flex items-center gap-3 px-3 mb-10"
-            >
-                <div className="w-11 h-11 rounded-xl bg-[#F8F1E7] flex items-center justify-center">
-                    <CalendarDays className="w-6 h-6 text-[#5B0F18]" />
-                </div>
-
-                <div>
-                    <span className="text-2xl font-bold tracking-tight">
+            {/* LOGO + SUBTITLE */}
+            <Link href="/" className="flex items-center gap-2">
+                <Image
+                    src="/Eventify.png"
+                    alt="Logo Eventify"
+                    width={48}
+                    height={48}
+                    className="h-16 w-16 object-contain -mr-3"
+                    priority
+                />
+                <div className="flex flex-col leading-tight">
+                    <span className="font-display text-2xl font-bold uppercase tracking-tight text-white">
                         Eventify
                     </span>
-
-                    <p className="text-[9px] text-[#D8A7A7] uppercase tracking-[0.18em]">
-                        {user?.role || "Account"}
-                    </p>
+                    {roleSubtitle && (
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#D4A537]">
+                            {roleSubtitle}
+                        </span>
+                    )}
                 </div>
             </Link>
 
             {/* MENU */}
-            <nav className="flex-1 space-y-2 overflow-y-auto no-scrollbar">
+            <nav className="flex-1 space-y-2 overflow-y-auto no-scrollbar mt-6">
 
                 {menuItems.map((item) => {
                     const Icon =
@@ -128,12 +151,13 @@ export default function Sidebar() {
                 <button
                     type="button"
                     onClick={handleLogout}
+                    disabled={loggingOut}
                     className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[#D8A7A7] hover:bg-[#7A1F2B] hover:text-[#F8F1E7] transition"
                 >
                     <LogOut className="w-4 h-4" />
 
                     <span className="text-sm font-medium">
-                        Logout
+                        {loggingOut ? "Logging out..." : "Logout"}
                     </span>
                 </button>
 

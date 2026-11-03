@@ -9,16 +9,6 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 import { getMyOrders } from "@/services/orderService";
 import { isAuthenticated } from "@/lib/auth";
 
-// Halaman ini adalah tujuan "Finish/Unfinish/Error Redirect URL" yang perlu
-// didaftarkan di Midtrans Dashboard (Settings > Configuration), contoh:
-//   https://domain-kalian.com/customer/payment/finish
-// Midtrans akan mengarahkan ke sini dengan query:
-//   ?order_id=INV-xxxxx&status_code=200&transaction_status=settlement
-// order_id di sini = invoice_number, bukan id order di database, jadi kita
-// cari dulu order-nya lewat riwayat order milik user, baru redirect ke
-// halaman status pembayaran (/customer/payment/[orderId]) yang sudah
-// polling status asli dari server.
-
 export default function PaymentFinishPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -40,12 +30,22 @@ export default function PaymentFinishPage() {
             }
 
             if (!invoiceNumber) {
+                const lastOrderId = localStorage.getItem("lastOrderId");
+
+                if (lastOrderId) {
+                    router.replace(`/customer/payment/${lastOrderId}`);
+                    return;
+                }
+
                 setNotFound(true);
                 return;
             }
 
             try {
                 const orders = await getMyOrders();
+                console.log("invoiceNumber dari Midtrans:", invoiceNumber);
+                console.log("daftar invoice_number di getMyOrders:", orders.map(o => o.invoice_number));
+
                 const order = orders.find(
                     (o) => o.invoice_number === invoiceNumber
                 );
@@ -77,7 +77,7 @@ export default function PaymentFinishPage() {
                     pesanan untuk melihat status terbaru.
                 </p>
                 <Link
-                    href="/customer/order"
+                    href="/customer/orders"
                     className="mt-2 rounded-2xl bg-[#5B0F18] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#7A1F2B]"
                 >
                     Lihat Riwayat Pesanan

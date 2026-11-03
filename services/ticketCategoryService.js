@@ -24,3 +24,4 @@ export const deleteTicketCategory = async (id) => {
     const response = await api.delete(`/ticket-categories/${id}`);
     return response.data.data;
 };
+

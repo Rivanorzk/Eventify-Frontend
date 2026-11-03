@@ -164,7 +164,7 @@ export default function LoginPage() {
             ))}
           </div>
           <div className="relative z-10">
-            <AuthLogo dark />
+            <AuthLogo dark size="lg" />
           </div>
 
           <div className="relative z-10 max-w-md animate-fade-up">

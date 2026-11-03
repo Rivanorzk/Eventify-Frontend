@@ -24,10 +24,6 @@ export default function UserLayout({ children }) {
 
         {/* MAIN AREA */}
         <div className="lg:ml-64">
-          {/* NAVBAR */}
-          <Navbar
-            onMenuClick={() => setMobileOpen(true)}
-          />
 
           {/* CONTENT */}
           <main className="min-h-[calc(100vh-82px)]">

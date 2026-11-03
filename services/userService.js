@@ -71,3 +71,16 @@ export const uploadAvatar = async (file) => {
 
     return response.data.data; 
 };
+
+export const uploadCover = async (file) => {
+    const formData = new FormData();
+    formData.append("cover", file);
+
+    const response = await api.post("/users/me/cover", formData, {
+        headers: {
+            "Content-Type": "multipart/form-data",
+        },
+    });
+
+    return response.data.data; 
+};

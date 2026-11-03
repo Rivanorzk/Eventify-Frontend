@@ -4,7 +4,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import Script from "next/script";
 import {
     ArrowLeft,
     CheckCircle2,
@@ -17,18 +16,18 @@ import {
 import { toast } from "react-hot-toast";
 
 import { getOrderById } from "@/services/orderService";
-import { createPayment, getPayment } from "@/services/paymentService";
+import { checkPaymentStatus, createPayment, getPayment } from "@/services/paymentService";
 import LoadingSpinner from "@/components/loadingSpinner";
 import EmptyState from "@/components/emptyState";
 import { currency, formatDate, formatTime } from "@/lib/formatter";
 
-// Sandbox / production Snap.js ditentukan oleh MIDTRANS_IS_PRODUCTION di backend.
-// Sesuaikan ke "https://app.midtrans.com/snap/snap.js" kalau sudah production.
-const SNAP_SRC = "https://app.sandbox.midtrans.com/snap/snap.js";
-const MIDTRANS_CLIENT_KEY = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY;
-
 const POLL_INTERVAL = 5000;
 const FINAL_ORDER_STATUSES = ["paid", "expired", "cancelled", "failed"];
+
+// Persentase biaya layanan, mis. "5.00" -> "5%", "2.50" -> "2,5%".
+function formatPercent(value) {
+    return `${new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 }).format(Number(value) || 0)}%`;
+}
 
 function StatusBadge({ status }) {
     const map = {
@@ -84,16 +83,20 @@ export default function PaymentPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const [snapReady, setSnapReady] = useState(false);
     const [payingLoading, setPayingLoading] = useState(false);
 
     const pollRef = useRef(null);
-    const hasRequestedPaymentRef = useRef(false);
+    // Simpan promise-nya sendiri (bukan cuma boolean "sudah diminta") supaya
+    // panggilan kedua dari React Strict Mode (dev mode meng-invoke effect 2x)
+    // ikut menunggu request createPayment yang sama, bukan nembak getPayment
+    // duluan sebelum row payment-nya sempat ke-insert di backend (itu yang
+    // sebelumnya kelihatan sebagai 404 di console).
+    const paymentPromiseRef = useRef(null);
 
     const countdown = useCountdown(order?.expired_at);
 
     // =========================
-    // Load order + create/fetch payment (snap token)
+    // Load order + create/fetch payment (Snap transaction Midtrans)
     // =========================
     const loadData = useCallback(async () => {
         try {
@@ -101,27 +104,18 @@ export default function PaymentPage() {
             setOrder(orderData);
 
             if (orderData.status === "pending") {
-                if (hasRequestedPaymentRef.current) {
-                    // createPayment sudah/sedang diminta di render sebelumnya
-                    // (mis. React dev mode memanggil effect 2x) — jangan
-                    // kirim request duplikat, tinggal ambil payment yg ada.
-                    try {
-                        const paymentData = await getPayment(orderId);
-                        setPayment(paymentData);
-                    } catch {
-                        // payment belum sempat tercatat, biarkan poll berikutnya yang ambil
-                    }
-                } else {
-                    hasRequestedPaymentRef.current = true;
-                    const paymentData = await createPayment(orderId);
-                    setPayment((prev) => ({ ...prev, ...paymentData }));
+                if (!paymentPromiseRef.current) {
+                    paymentPromiseRef.current = createPayment(orderId);
                 }
+
+                const paymentData = await paymentPromiseRef.current;
+                setPayment((prev) => ({ ...prev, ...paymentData }));
             } else {
                 try {
                     const paymentData = await getPayment(orderId);
                     setPayment(paymentData);
                 } catch {
-                    // payment record mungkin belum ada, biarkan saja
+                    // payment raaord mungkin belum ada, biarkan saja
                 }
             }
 
@@ -143,7 +137,7 @@ export default function PaymentPage() {
 
     // =========================
     // Polling status selama order masih pending
-    // (menunggu callback/webhook Midtrans diproses backend)
+    // (menunggu notifikasi/webhook Midtrans diproses backend)
     // =========================
     useEffect(() => {
         if (!order) return;
@@ -174,48 +168,33 @@ export default function PaymentPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [order?.status, orderId]);
 
+    // Midtrans Snap menyediakan halaman pembayaran hosted (redirect_url) —
+    // cukup arahkan user ke sana, tidak perlu embed snap.js/popup. Setelah
+    // selesai bayar, Midtrans akan redirect balik ke halaman
+    // /customer/payment/finish (dengan query ?order_id=...&status_code=...
+    // &transaction_status=...), yang kembali ke halaman ini.
     const handlePay = () => {
-        if (!payment?.snap_token) {
-            toast.error("Token pembayaran belum siap, coba beberapa saat lagi");
+        if (!payment?.redirect_url) {
+            toast.error("Link pembayaran belum siap, coba beberapa saat lagi");
             return;
         }
 
-        if (!window.snap) {
-            toast.error("Sistem pembayaran belum siap, muat ulang halaman");
-            return;
-        }
+        localStorage.setItem("lastOrderId", orderId); // <-- tambahkan ini
 
         setPayingLoading(true);
-
-        window.snap.pay(payment.snap_token, {
-            onSuccess: () => {
-                toast.success("Pembayaran diterima, menunggu konfirmasi...");
-                loadData();
-            },
-            onPending: () => {
-                toast("Selesaikan pembayaran sesuai instruksi yang diberikan", {
-                    icon: "⏳",
-                });
-                loadData();
-            },
-            onError: () => {
-                toast.error("Pembayaran gagal, silakan coba lagi");
-            },
-            onClose: () => {
-                toast("Kamu bisa melanjutkan pembayaran kapan saja sebelum waktu habis", {
-                    icon: "ℹ️",
-                });
-            },
-        });
-
-        setPayingLoading(false);
+        window.location.href = payment.redirect_url;
     };
 
     const handleRefresh = async () => {
-        setLoading(true);
-        await loadData();
-        setLoading(false);
-    };
+    setLoading(true);
+    try {
+        await checkPaymentStatus(orderId); // tanya Midtrans langsung + update DB
+    } catch (err) {
+        console.error("Error checking payment status:", err);
+    }
+    await loadData(); // ambil order terbaru (yang sudah ter-update)
+    setLoading(false);
+};
 
     /* =========================
        LOADING
@@ -253,17 +232,15 @@ export default function PaymentPage() {
     const isPaid = order.status === "paid";
     const isFailedState = ["expired", "cancelled", "failed"].includes(order.status);
 
+    // Rincian harga. Total yang ditagihkan Midtrans = harga tiket setelah
+    // diskon + biaya layanan (grand_total). Order lama yang dibuat sebelum
+    // ada biaya layanan belum punya grand_total, jadi pakai final_price.
+    const serviceFee = Number(order.service_fee) || 0;
+    const serviceFeePercent = Number(order.service_fee_percent) || 0;
+    const grandTotal = order.grand_total ?? order.final_price;
+
     return (
         <div className="mx-auto max-w-2xl">
-            {MIDTRANS_CLIENT_KEY && (
-                <Script
-                    src={SNAP_SRC}
-                    data-client-key={MIDTRANS_CLIENT_KEY}
-                    onLoad={() => setSnapReady(true)}
-                    strategy="afterInteractive"
-                />
-            )}
-
             {/* TOP BAR */}
             <div className="mb-6 flex items-center gap-3">
                 <button
@@ -296,7 +273,7 @@ export default function PaymentPage() {
                     <div>
                         <p className="text-sm text-[#8C7777]">Total Pembayaran</p>
                         <p className="text-2xl font-bold text-[#5B0F18]">
-                            {currency(order.final_price)}
+                            {currency(grandTotal)}
                         </p>
                     </div>
 
@@ -326,6 +303,18 @@ export default function PaymentPage() {
                                 {formatDate(order.created_at)} {formatTime(order.created_at)}
                             </span>
                         </div>
+                        {payment?.payment_type && (
+                            <div className="flex justify-between text-[#8C7777]">
+                                <span>Metode Pembayaran</span>
+                                <span className="font-medium capitalize text-[#1E1E1E]">
+                                    {payment.payment_type.replace(/_/g, " ")}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* RINCIAN HARGA */}
+                    <div className="mt-4 space-y-2 border-t border-[#F0EDED] pt-4 text-sm">
                         <div className="flex justify-between text-[#8C7777]">
                             <span>Harga Tiket</span>
                             <span>{currency(order.total_price)}</span>
@@ -336,14 +325,19 @@ export default function PaymentPage() {
                                 <span>-{currency(order.discount_amount)}</span>
                             </div>
                         )}
-                        {payment?.payment_type && (
+                        {serviceFee > 0 && (
                             <div className="flex justify-between text-[#8C7777]">
-                                <span>Metode Pembayaran</span>
-                                <span className="font-medium capitalize text-[#1E1E1E]">
-                                    {payment.payment_type.replace(/_/g, " ")}
+                                <span>
+                                    Biaya Layanan
+                                    {serviceFeePercent > 0 && ` (${formatPercent(serviceFeePercent)})`}
                                 </span>
+                                <span>{currency(serviceFee)}</span>
                             </div>
                         )}
+                        <div className="flex justify-between border-t border-[#F0EDED] pt-2 font-bold text-[#1E1E1E]">
+                            <span>Total Pembayaran</span>
+                            <span className="text-[#5B0F18]">{currency(grandTotal)}</span>
+                        </div>
                     </div>
                 </div>
 
@@ -351,10 +345,10 @@ export default function PaymentPage() {
                 {isPending && (
                     <button
                         onClick={handlePay}
-                        disabled={!snapReady || !payment?.snap_token || payingLoading}
+                        disabled={!payment?.redirect_url || payingLoading}
                         className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#5B0F18] py-3.5 text-sm font-bold text-white transition hover:bg-[#7A1F2B] disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                        {payingLoading || !snapReady ? (
+                        {payingLoading || !payment?.redirect_url ? (
                             <>
                                 <Loader2 className="h-4 w-4 animate-spin" />
                                 Menyiapkan pembayaran...
@@ -380,7 +374,7 @@ export default function PaymentPage() {
 
                 {isPaid && (
                     <Link
-                        href="/customer/ticket"
+                        href="/customer/tickets"
                         className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#5B0F18] py-3.5 text-sm font-bold text-white transition hover:bg-[#7A1F2B]"
                     >
                         Lihat Tiket Saya

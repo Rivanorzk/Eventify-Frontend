@@ -46,32 +46,32 @@ export const menus = {
             icon: "LayoutDashboard",
         },
         {
-            title: "Event",
+            title: "Management Event",
             href: "/admin/events",
             icon: "CalendarDays",
         },
         {
-            title: "Kategori",
+            title: "Kelola Kategori",
             href: "/admin/categories",
             icon: "Tags",
         },
         {
-            title: "Pesanan",
+            title: "Kelola Pesanan",
             href: "/admin/orders",
             icon: "Receipt",
         },
         {
-            title: "Tiket",
+            title: "Kelola Tiket",
             href: "/admin/tickets",
             icon: "Ticket",
         },
         {
-            title: "Tiket Category",
+            title: "Kelola Tiket Kategori",
             href: "/admin/ticket-categories",
             icon: "Ticket",
         },
         {
-            title: "Voucher",
+            title: "Kelola Voucher",
             href: "/admin/vouchers",
             icon: "Gift",
         },
@@ -94,29 +94,9 @@ export const menus = {
             icon: "CalendarDays",
         },
         {
-            title: "Kategori Event",
-            href: "/superadmin/categories",
-            icon: "Tags",
-        },
-        {
-            title: "Kategori Tiket",
-            href: "/superadmin/ticket-categories",
-            icon: "Ticket",
-        },
-        {
-            title: "Voucher",
-            href: "/superadmin/vouchers",
-            icon: "Gift",
-        },
-        {
             title: "Pesanan",
             href: "/superadmin/orders",
             icon: "ShoppingBag",
-        },
-        {
-            title: "Check-in",
-            href: "/superadmin/redemption",
-            icon: "QrCode",
         },
         {
             title: "Users",
