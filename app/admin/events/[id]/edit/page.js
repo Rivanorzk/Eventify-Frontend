@@ -335,7 +335,7 @@ export default function EditEventPage() {
 
     return (
         <div className="min-h-screen p-5 lg:p-8">
-            <div className="max-w-4xl mx-auto">
+            <div className="max-w-5xl mx-auto">
                 <Link href={`/admin/events/${id}`} className="flex items-center gap-2 text-sm text-[#7A1F2B] mb-6">
                     <ArrowLeft className="w-4 h-4" />
                     Back

@@ -1,9 +1,9 @@
-// app/customer/vouchers/page.js
+// app/customer/voucher/page.js
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
     Gift,
     Ticket,
@@ -100,21 +100,21 @@ const byTab = (tabKey) => (a, b) => {
 // Form redeem
 // ---------------------------------------------------------------------
 
-function RedeemBox({ onRedeemed, initialCode = "" }) {
-    const [code, setCode] = useState(() => normalizeCode(initialCode));
-    const [prefilled, setPrefilled] = useState(Boolean(initialCode));
+// prefill = { code, nonce } | null. Nonce membuat kode yang sama tetap
+// mengisi ulang kolom kalau customer klik notifikasinya lagi.
+function RedeemBox({ onRedeemed, prefill = null }) {
+    const [code, setCode] = useState(() => normalizeCode(prefill?.code));
+    const [prefilled, setPrefilled] = useState(Boolean(prefill?.code));
     const [loading, setLoading] = useState(false);
     const [feedback, setFeedback] = useState(null);
 
-    // Kalau customer klik notifikasi lain saat sudah berada di halaman ini,
-    // kolom ikut terisi dengan kode yang baru.
     useEffect(() => {
-        if (initialCode) {
-            setCode(normalizeCode(initialCode));
+        if (prefill?.code) {
+            setCode(normalizeCode(prefill.code));
             setPrefilled(true);
             setFeedback(null);
         }
-    }, [initialCode]);
+    }, [prefill]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -365,10 +365,24 @@ function VoucherCard({ voucher }) {
 
 function VouchersContent() {
     const router = useRouter();
+    const pathname = usePathname();
     const searchParams = useSearchParams();
 
-    // Kode dari link notifikasi: /customer/vouchers?code=KODE
-    const initialCode = searchParams.get("code") || "";
+    // Kode dari link notifikasi (?code=KODE). Kode disimpan
+    // di state lalu ?code= langsung dihapus dari URL, jadi customer hanya
+    // melihat /customer/vouchers.
+    const codeParam = searchParams.get("code");
+    const [prefill, setPrefill] = useState(() =>
+        codeParam ? { code: normalizeCode(codeParam), nonce: Date.now() } : null
+    );
+
+    useEffect(() => {
+        if (!codeParam) return;
+        setPrefill({ code: normalizeCode(codeParam), nonce: Date.now() });
+        // Pakai path halaman yang sedang dibuka, jadi tidak bergantung
+        // pada nama folder (voucher / vouchers).
+        router.replace(pathname, { scroll: false });
+    }, [codeParam, router, pathname]);
 
     const [vouchers, setVouchers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -396,12 +410,7 @@ function VouchersContent() {
     const handleRedeemed = (voucher) => {
         setVouchers((prev) => [voucher, ...prev.filter((v) => v.id !== voucher.id)]);
         setActiveTab("available");
-
-        // Bersihkan ?code= supaya refresh halaman tidak mengisi ulang
-        // kode yang sudah ditukar.
-        if (initialCode) {
-            router.replace("/customer/vouchers", { scroll: false });
-        }
+        setPrefill(null);
     };
 
     const grouped = useMemo(() => {
@@ -425,7 +434,7 @@ function VouchersContent() {
             />
 
             <div className="mt-8 space-y-8">
-                <RedeemBox onRedeemed={handleRedeemed} initialCode={initialCode} />
+                <RedeemBox onRedeemed={handleRedeemed} prefill={prefill} />
 
                 {loading ? (
                     <LoadingSpinner text="Memuat voucher..." />

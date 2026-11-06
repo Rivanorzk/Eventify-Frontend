@@ -463,7 +463,7 @@ export default function DashboardPage() {
                 </div>
 
                 {/* ===== CATEGORY TABS ===== */}
-                <div className="mb-4 flex items-center gap-2 overflow-x-auto pb-1">
+                <div className="mb-4 flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
                     {categories.map((cat) => {
                         const isActive = activeCategory === cat.id;
                         return (

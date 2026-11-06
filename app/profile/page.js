@@ -29,6 +29,7 @@ import useAuth from "@/hooks/useAuth";
 import LoadingSpinner from "@/components/loadingSpinner";
 import EmptyState from "@/components/emptyState";
 import EditProfileModal from "@/components/editProfileModal";
+import AvatarCropModal from "@/components/avatarCropModal";
 import { toast } from "react-hot-toast";
 
 const MONTHS_ID = [
@@ -60,6 +61,8 @@ export default function ProfilePage() {
 
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
     const fileInputRef = useRef(null);
+    const [cropModalOpen, setCropModalOpen] = useState(false);
+    const [cropImageSrc, setCropImageSrc] = useState(null);
 
     const [uploadingCover, setUploadingCover] = useState(false);
     const coverInputRef = useRef(null);
@@ -82,30 +85,47 @@ export default function ProfilePage() {
         }
     };
 
-    const handleAvatarUpload = async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        if (!file.type.startsWith("image/")) {
-            toast.error("Please select an image file");
-            return;
-        }
-        if (file.size > 2 * 1024 * 1024) {
-            toast.error("Image size must be less than 2MB");
-            return;
-        }
-        try {
-            setUploadingAvatar(true);
-            const data = await uploadAvatar(file);
-            setProfile({ ...profile, profile_image: data.profile_image });
-            toast.success("Profile photo updated!");
-        } catch (error) {
-            console.error("Upload avatar error:", error);
-            toast.error(error?.response?.data?.message || "Failed to upload photo");
-        } finally {
-            setUploadingAvatar(false);
-            e.target.value = "";
-        }
+    // 1) Dipanggil saat user memilih file — validasi & buka modal crop
+const handleAvatarSelect = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // reset supaya bisa pilih file yang sama lagi
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+        toast.error("Please select an image file");
+        return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+        toast.error("Image size must be less than 5MB");
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+        setCropImageSrc(reader.result); // dataURL untuk Cropper
+        setCropModalOpen(true);
     };
+    reader.onerror = () => toast.error("Gagal membaca file gambar");
+    reader.readAsDataURL(file);
+};
+
+// 2) Dipanggil setelah user klik "Simpan Foto" di modal crop
+const handleCroppedAvatar = async (blob) => {
+    try {
+        setUploadingAvatar(true);
+        const file = new File([blob], `avatar-${Date.now()}.jpg`, {
+            type: "image/jpeg",
+        });
+        const data = await uploadAvatar(file);
+        setProfile((prev) => ({ ...prev, profile_image: data.profile_image }));
+        toast.success("Profile photo updated!");
+    } catch (error) {
+        console.error("Upload avatar error:", error);
+        toast.error(error?.response?.data?.message || "Failed to upload photo");
+    } finally {
+        setUploadingAvatar(false);
+    }
+};
 
     const handleCoverUpload = async (e) => {
         const file = e.target.files?.[0];
@@ -288,7 +308,7 @@ export default function ProfilePage() {
                                     ref={fileInputRef}
                                     type="file"
                                     accept="image/*"
-                                    onChange={handleAvatarUpload}
+                                    onChange={handleAvatarSelect}
                                     className="hidden"
                                 />
                             </div>
@@ -582,6 +602,16 @@ export default function ProfilePage() {
                 onClose={() => setEditModalOpen(false)}
                 profile={profile}
                 onUpdate={handleUpdateProfile}
+            />
+
+            <AvatarCropModal
+                isOpen={cropModalOpen}
+                imageSrc={cropImageSrc}
+                onClose={() => {
+                    setCropModalOpen(false);
+                    setCropImageSrc(null);
+                }}
+                onCropComplete={handleCroppedAvatar}
             />
         </div>
     );

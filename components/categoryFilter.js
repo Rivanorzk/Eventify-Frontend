@@ -8,7 +8,7 @@ export default function CategoryFilter({
   return (
     <section className="mt-8 text-black">
 
-      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+      <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
         <button
           type="button"
           onClick={() => onChange?.("All")}

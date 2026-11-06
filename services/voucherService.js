@@ -32,8 +32,6 @@ export const redeemVoucher = async (promoCode) => {
     return response.data.data;
 };
 
-// Cek apakah voucher milik customer bisa dipakai untuk event & jumlah tiket ini.
-// Harga final tetap dihitung server saat membuat order.
 export const validateVoucher = async ({
     userVoucherId,
     eventId,

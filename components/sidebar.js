@@ -91,7 +91,7 @@ export default function Sidebar() {
         <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 z-40 w-[250px] bg-[#5B0F18] text-[#F8F1E7] flex-col px-5 py-6">
 
             {/* LOGO + SUBTITLE */}
-            <Link href="/" className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
                 <Image
                     src="/Eventify.png"
                     alt="Logo Eventify"
@@ -110,7 +110,7 @@ export default function Sidebar() {
                         </span>
                     )}
                 </div>
-            </Link>
+            </div>
 
             {/* MENU */}
             <nav className="flex-1 space-y-2 overflow-y-auto no-scrollbar mt-6">
