@@ -41,6 +41,7 @@ export default function EditVoucherPage() {
         quota: 1,
         start_date: "",
         end_date: "",
+        status: "active",
     });
 
     useEffect(() => {
@@ -74,6 +75,7 @@ export default function EditVoucherPage() {
                     quota: voucherData.quota ?? 1,
                     start_date: toDateTimeLocal(voucherData.start_date),
                     end_date: toDateTimeLocal(voucherData.end_date),
+                    status: voucherData.status ?? "active",
                 });
             } catch (err) {
                 console.error("Failed to load voucher:", err);
@@ -151,12 +153,24 @@ export default function EditVoucherPage() {
             setError("End date must be after start date.");
             return;
         }
+        // Voucher aktif yang end_date-nya sudah lewat otomatis di-set
+        // inactive oleh server, jadi cegah kombinasi ini dari awal.
+        if (
+            form.status === "active" &&
+            new Date(form.end_date) <= new Date()
+        ) {
+            setError(
+                "End date sudah lewat. Perpanjang end date atau ubah status menjadi inactive."
+            );
+            return;
+        }
 
         try {
             setLoading(true);
 
             await updateVoucher(voucherId, {
-                event_id: Number(form.event_id),
+                // event_id tidak dikirim: event voucher tidak bisa diubah
+                // setelah dibuat (ditolak validator backend).
                 title: form.title.trim(),
                 promo_code: form.promo_code.trim(),
                 minimum_quantity: Number(form.minimum_ticket),
@@ -165,6 +179,7 @@ export default function EditVoucherPage() {
                 quota: Number(form.quota),
                 start_date: new Date(form.start_date).toISOString(),
                 end_date: new Date(form.end_date).toISOString(),
+                status: form.status,
             });
 
             router.push("/admin/vouchers");
@@ -282,9 +297,9 @@ export default function EditVoucherPage() {
                                 name="event_id"
                                 value={form.event_id}
                                 onChange={handleChange}
-                                disabled={loadingEvents}
+                                disabled
                                 required
-                                className="h-14 w-full rounded-xl border border-[#E3D3CA] bg-white px-4 text-base outline-none transition focus:border-[#8B2635]"
+                                className="h-14 w-full cursor-not-allowed rounded-xl border border-[#E3D3CA] bg-[#F6F3F2] px-4 text-base text-[#6F5A5A] outline-none"
                             >
                                 <option value="">
                                     {loadingEvents
@@ -297,6 +312,9 @@ export default function EditVoucherPage() {
                                     </option>
                                 ))}
                             </select>
+                            <p className="mt-2 text-xs text-[#8C7777]">
+                                Event tidak dapat diubah setelah voucher dibuat.
+                            </p>
                         </div>
 
                         {/* TITLE + PROMO CODE */}
@@ -446,6 +464,27 @@ export default function EditVoucherPage() {
                                     className="h-14 w-full rounded-xl border border-[#E3D3CA] px-4 text-base outline-none transition focus:border-[#8B2635]"
                                 />
                             </div>
+                        </div>
+
+                        {/* STATUS */}
+                        <div>
+                            <label className="mb-2 block text-sm font-bold text-[#1E1E1E]">
+                                Status
+                            </label>
+                            <select
+                                name="status"
+                                value={form.status}
+                                onChange={handleChange}
+                                className="h-14 w-full rounded-xl border border-[#E3D3CA] bg-white px-4 text-base outline-none transition focus:border-[#8B2635]"
+                            >
+                                <option value="draft">Draft</option>
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                            </select>
+                            <p className="mt-2 text-xs text-[#8C7777]">
+                                Voucher berstatus Active otomatis menjadi Inactive saat End Date lewat.
+                                Untuk mengaktifkannya lagi, perpanjang End Date lalu pilih Active.
+                            </p>
                         </div>
 
                         {/* ACTION */}

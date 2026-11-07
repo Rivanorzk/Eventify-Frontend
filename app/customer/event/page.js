@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import CategoryFilter from "@/components/categoryFilter";
 import EventGrid from "@/components/eventGrid";
@@ -13,16 +14,36 @@ import { getCategories } from "@/services/categoryService";
 
 import { useSearch } from "@/contexts/searchContext";
 
-export default function CustomerEventPage() {
+function CustomerEventContent() {
   const { search } = useSearch();
+  const router = useRouter();
+  const pathname = usePathname(); // rute halaman ini, jadi tidak perlu hardcode "/event"
+  const searchParams = useSearchParams();
 
   const [events, setEvents] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [activeCategory, setActiveCategory] = useState("All");
   const [favorites, setFavorites] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Filter awal diambil dari URL, contoh: /event?category=3
+  const categoryParam = searchParams.get("category");
+  const [activeCategory, setActiveCategory] = useState(categoryParam || "All");
+
+  // Ikuti perubahan URL (mis. klik link kategori dari halaman detail event)
+  useEffect(() => {
+    setActiveCategory(categoryParam || "All");
+  }, [categoryParam]);
+
+  // Klik filter -> simpan ke URL supaya refresh / tombol back tetap di filter yang sama
+  const handleCategoryChange = (value) => {
+    setActiveCategory(value);
+    router.replace(
+      value === "All" ? pathname : `${pathname}?category=${value}`,
+      { scroll: false }
+    );
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -78,7 +99,7 @@ export default function CustomerEventPage() {
       <CategoryFilter
         categories={categories}
         activeCategory={activeCategory}
-        onChange={setActiveCategory}
+        onChange={handleCategoryChange}
       />
 
       <div className="mt-8">
@@ -102,5 +123,14 @@ export default function CustomerEventPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// useSearchParams wajib dibungkus Suspense, kalau tidak `next build` gagal.
+export default function CustomerEventPage() {
+  return (
+    <Suspense fallback={<LoadingSpinner text="Loading events..." />}>
+      <CustomerEventContent />
+    </Suspense>
   );
 }

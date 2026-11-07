@@ -60,18 +60,33 @@ export default function AdminVouchersPage() {
         ).toLocaleString("id-ID")}`;
     };
 
-    const handleDelete = async (id) => {
+    // Voucher yang sudah pernah di-redeem hanya bisa dihapus kalau sudah
+    // inactive (otomatis saat end_date lewat). Backend tetap memvalidasi.
+    const canDelete = (voucher) =>
+        Number(voucher.used_quota || 0) === 0 ||
+        voucher.status === "inactive";
+
+    const statusBadgeClass = (status) => {
+        if (status === "active") return "bg-green-50 text-green-700";
+        if (status === "inactive") return "bg-gray-100 text-gray-600";
+        return "bg-[#F8F1E7] text-[#7A1F2B]"; // draft / lainnya
+    };
+
+    const handleDelete = async (voucher) => {
         if (!window.confirm("Delete this voucher?")) return;
 
         try {
-            await deleteVoucher(id);
+            await deleteVoucher(voucher.id);
 
             setVouchers((current) =>
-                current.filter((voucher) => voucher.id !== id)
+                current.filter((item) => item.id !== voucher.id)
             );
         } catch (error) {
             console.error("Failed to delete voucher:", error);
-            alert("Failed to delete voucher.");
+            alert(
+                error?.response?.data?.message ||
+                    "Failed to delete voucher."
+            );
         }
     };
 
@@ -185,7 +200,7 @@ export default function AdminVouchersPage() {
                                                         </p>
 
                                                         <p className="text-xs text-[#8C7777]">
-                                                            {voucher.minimum_ticket} minimum
+                                                            {voucher.minimum_quantity} minimum
                                                         </p>
                                                     </div>
                                                 </div>
@@ -207,8 +222,12 @@ export default function AdminVouchersPage() {
                                             </td>
 
                                             <td className="px-5 py-4">
-                                                <span className="rounded-full bg-[#F8F1E7] px-3 py-1 text-[11px] font-semibold text-[#7A1F2B]">
-                                                    {voucher.status || "belum digunakan"}
+                                                <span
+                                                    className={`rounded-full px-3 py-1 text-[11px] font-semibold capitalize ${statusBadgeClass(
+                                                        voucher.status
+                                                    )}`}
+                                                >
+                                                    {voucher.status || "-"}
                                                 </span>
                                             </td>
 
@@ -223,11 +242,15 @@ export default function AdminVouchersPage() {
 
                                                     <button
                                                         onClick={() =>
-                                                            handleDelete(
-                                                                voucher.id
-                                                            )
+                                                            handleDelete(voucher)
                                                         }
-                                                        className="w-9 h-9 rounded-lg border border-red-100 flex items-center justify-center text-red-600"
+                                                        disabled={!canDelete(voucher)}
+                                                        title={
+                                                            canDelete(voucher)
+                                                                ? "Delete voucher"
+                                                                : "Voucher sudah di-redeem. Bisa dihapus setelah berstatus inactive."
+                                                        }
+                                                        className="w-9 h-9 rounded-lg border border-red-100 flex items-center justify-center text-red-600 disabled:cursor-not-allowed disabled:opacity-30"
                                                     >
                                                         <Trash2 className="w-4 h-4" />
                                                     </button>
