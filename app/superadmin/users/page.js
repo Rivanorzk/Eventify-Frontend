@@ -2,7 +2,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ShieldCheck, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 import {
@@ -52,7 +53,7 @@ export default function UsersPage() {
 
         try {
             setUpdatingId(user.id);
-            await updateRole(user.id, newRole);
+            await updateUserRole(user.id, newRole);
             toast.success("Role berhasil diperbarui");
             setUsers((prev) =>
                 prev.map((u) => (u.id === user.id ? { ...u, role: newRole } : u))
@@ -105,14 +106,23 @@ export default function UsersPage() {
 
     return (
         <div>
-            <div className="mb-6">
-                <h1 className="flex items-center gap-2 text-xl font-bold text-[#1E1E1E]">
-                    <ShieldCheck className="h-5 w-5 text-[#7A1F2B]" />
-                    Users
-                </h1>
-                <p className="mt-1 text-sm text-[#8C7777]">
-                    {users.length} user terdaftar. Ubah role, aktif/nonaktifkan, atau hapus akun.
-                </p>
+            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h1 className="flex items-center gap-2 text-xl font-bold text-[#1E1E1E]">
+                        <ShieldCheck className="h-5 w-5 text-[#7A1F2B]" />
+                        Users
+                    </h1>
+                    <p className="mt-1 text-sm text-[#8C7777]">
+                        {users.length} user terdaftar. Ubah role, aktif/nonaktifkan, atau hapus akun.
+                    </p>
+                </div>
+                <Link
+                    href="/superadmin/users/create"
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#5B0F18] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#7A1F2B]"
+                >
+                    <Plus className="h-4 w-4" />
+                    Tambah Admin
+                </Link>
             </div>
 
             {loading ? (

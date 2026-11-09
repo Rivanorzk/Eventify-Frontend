@@ -21,3 +21,8 @@ export async function getEventAnalytics(eventId, { range = "all" } = {}) {
     });
     return response.data.data;
 }
+
+export async function getOrganizerList(params = {}) {
+    const { data } = await api.get("/dashboard/organizers", { params });
+    return data.data;
+}

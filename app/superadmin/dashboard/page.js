@@ -870,7 +870,7 @@ export default function SuperadminDashboardPage() {
                                 {formatNumber(stats?.active_organizers)} aktif dari {formatNumber(stats?.total_organizers)}
                             </span>
                             <Link
-                                href="/superadmin/organizers"
+                                href="/superadmin/admin"
                                 className="rounded-xl bg-[#5B0F18] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#7A1F2B]"
                             >
                                 Buka

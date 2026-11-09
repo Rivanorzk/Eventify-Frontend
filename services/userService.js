@@ -21,6 +21,11 @@ export const updateRole = async (id, role) => {
     const { data } = await api.put(`/users/${id}/role`, { role });
     return data.data;
 };
+
+export async function createUser(payload) {
+    const { data } = await api.post("/users", payload);
+    return data.data;
+}
  
 /** [ADMIN/SUPERADMIN] */
 export const updateStatus = async (id, status, isActive) => {
