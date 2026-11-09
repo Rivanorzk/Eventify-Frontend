@@ -9,7 +9,7 @@ import { toast } from "react-hot-toast";
 import {
     deleteUser,
     getUsers,
-    updateUserRole,
+    updateRole,
     updateStatus,
 } from "@/services/userService";
 import LoadingSpinner from "@/components/loadingSpinner";
@@ -53,7 +53,7 @@ export default function UsersPage() {
 
         try {
             setUpdatingId(user.id);
-            await updateUserRole(user.id, newRole);
+            await updateRole(user.id, newRole);
             toast.success("Role berhasil diperbarui");
             setUsers((prev) =>
                 prev.map((u) => (u.id === user.id ? { ...u, role: newRole } : u))
