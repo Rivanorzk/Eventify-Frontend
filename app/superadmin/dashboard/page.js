@@ -216,7 +216,7 @@ export default function SuperadminDashboardPage() {
 
         return [
             {
-                label: "Total Transaksi",
+                label: "Total Transaksi (GMV)",
                 value: formatCompactRupiah(stats.total_sales),
                 icon: Receipt,
                 trend: `${gmvGrowth > 0 ? "+" : ""}${gmvGrowth}%`,
@@ -225,10 +225,10 @@ export default function SuperadminDashboardPage() {
                 accent: "border-t-4 border-t-[#5B0F18]",
             },
             {
-                label: "Biaya Layanan",
+                label: "Pendapatan Platform",
                 value: formatCompactRupiah(stats.service_fee_collected),
                 icon: Receipt,
-                note: "Pendapatan platform dari biaya layanan",
+                note: `Biaya layanan ${Number(stats.service_fee_percent ?? 0)}% dari harga tiket`,
                 accent: "border-t-4 border-t-[#B4841F]",
             },
             {
@@ -238,12 +238,13 @@ export default function SuperadminDashboardPage() {
                 note: "Total tiket berbayar seluruh platform",
             },
             {
-                label: "Event Aktif",
-                value: formatNumber(stats.published_events),
-                icon: ShieldAlert,
-                badge: `${formatNumber(stats.pending_moderation)} draft menunggu`,
+                label: "Organizer & Event",
+                value: formatNumber(stats.active_organizers),
+                suffix: `/ ${formatNumber(stats.total_organizers)} organizer`,
+                icon: Building2,
+                badge: `${formatNumber(stats.published_events)} event aktif • ${formatNumber(stats.pending_moderation)} draft`,
                 badgeClasses: "bg-[#F0EDED] text-[#8C7777]",
-                note: "Event berstatus published",
+                note: "Organizer aktif dan event published",
             },
         ];
     }, [stats, period]);
@@ -296,8 +297,8 @@ export default function SuperadminDashboardPage() {
                 startY: 54,
                 head: [["Metrik", "Nilai"]],
                 body: [
-                    [`Total Transaksi (${periodLabel(period)})`, formatRupiah(stats.total_sales)],
-                    ["Biaya Layanan Platform", formatRupiah(stats.service_fee_collected)],
+                    [`Total Transaksi / GMV (${periodLabel(period)})`, formatRupiah(stats.total_sales)],
+                    ["Pendapatan Platform (Biaya Layanan)", formatRupiah(stats.service_fee_collected)],
                     ["Tiket Terjual", formatNumber(stats.tickets_sold)],
                     ["Total Pengguna", formatNumber(stats.total_users)],
                     [
@@ -306,7 +307,7 @@ export default function SuperadminDashboardPage() {
                     ],
                     ["Event Aktif (Published)", formatNumber(stats.published_events)],
                     ["Event Draft", formatNumber(stats.pending_moderation)],
-                    ["Biaya Layanan", `${Number(stats.service_fee_percent ?? 0)}% dari harga tiket`],
+                    ["Persentase Biaya Layanan", `${Number(stats.service_fee_percent ?? 0)}% dari harga tiket`],
                 ],
                 theme: "grid",
                 headStyles: { fillColor: maroon, textColor: 255, fontStyle: "bold" },

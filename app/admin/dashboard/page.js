@@ -194,13 +194,18 @@ export default function AdminDashboardPage() {
         if (!stats) return [];
 
         const growth = stats.total_sales_growth_percent ?? 0;
+        // total_sales   = total yang dibayar pembeli (harga tiket + biaya layanan)
+        // net_revenue   = hak organizer (harga tiket setelah diskon)
         const totalSales = Number(stats.total_sales ?? 0);
         const serviceFee = Number(stats.service_fee_collected ?? 0);
-        const eventRevenue = Math.max(0, totalSales - serviceFee); // hak organizer
+        const netRevenue = Number(stats.net_revenue ?? 0);
 
         const ticketsSold = Number(stats.tickets_sold ?? 0);
         const ticketsQuota = Number(stats.tickets_quota ?? 0);
         const soldPercent = ticketsQuota > 0 ? Math.round((ticketsSold / ticketsQuota) * 100) : 0;
+
+        const checkedIn = Number(stats.checked_in ?? 0);
+        const checkInPercent = ticketsSold > 0 ? Math.round((checkedIn / ticketsSold) * 100) : 0;
 
         return [
             {
@@ -209,20 +214,14 @@ export default function AdminDashboardPage() {
                 icon: Wallet,
                 trend: `${growth > 0 ? "+" : ""}${growth}%`,
                 trendDown: growth < 0,
-                note: period === "30d" ? "vs 30 hari sebelumnya" : "vs bulan sebelumnya",
+                note: `${period === "30d" ? "vs 30 hari sebelumnya" : "vs bulan sebelumnya"} (${formatCompactRupiah(stats.previous_total_sales)})`,
                 accent: "border-t-4 border-t-[#5B0F18]",
             },
             {
-                label: "Biaya Layanan",
-                value: formatCompactRupiah(serviceFee),
-                icon: Ticket,
-                note: "Biaya layanan platform dari penjualan Anda",
-            },
-            {
-                label: "Pendapatan Event",
-                value: formatCompactRupiah(eventRevenue),
+                label: "Pendapatan Bersih",
+                value: formatCompactRupiah(netRevenue),
                 icon: Wallet,
-                note: "Total penjualan dikurangi biaya layanan",
+                note: `Total penjualan dikurangi biaya layanan ${formatCompactRupiah(serviceFee)}`,
                 accent: "border-t-4 border-t-[#B4841F]",
             },
             {
@@ -232,6 +231,13 @@ export default function AdminDashboardPage() {
                 icon: CheckCircle2,
                 percent: soldPercent,
                 note: `${formatNumber(Math.max(0, ticketsQuota - ticketsSold))} pax tersisa`,
+            },
+            {
+                label: "Tiket Check-in",
+                value: formatNumber(checkedIn),
+                suffix: `/ ${formatNumber(ticketsSold)}`,
+                icon: QrCode,
+                note: `${checkInPercent}% pembeli sudah hadir`,
             },
         ];
     }, [stats, period]);
@@ -279,7 +285,7 @@ export default function AdminDashboardPage() {
 
             const totalSales = Number(stats.total_sales ?? 0);
             const serviceFee = Number(stats.service_fee_collected ?? 0);
-            const eventRevenue = Math.max(0, totalSales - serviceFee);
+            const eventRevenue = Number(stats.net_revenue ?? 0);
 
             doc.setFillColor(...maroon);
             doc.rect(0, 0, 210, 32, "F");
@@ -303,7 +309,7 @@ export default function AdminDashboardPage() {
                 body: [
                     ["Total Penjualan", formatRupiah(totalSales)],
                     ["Biaya Layanan", formatRupiah(serviceFee)],
-                    ["Pendapatan Event", formatRupiah(eventRevenue)],
+                    ["Pendapatan Bersih", formatRupiah(eventRevenue)],
                     [
                         "Tiket Terjual",
                         `${formatNumber(stats.tickets_sold ?? 0)} / ${formatNumber(stats.tickets_quota ?? 0)}`,
@@ -390,15 +396,6 @@ export default function AdminDashboardPage() {
     return (
         <div className="min-h-screen bg-[#F8F1E7]">
             <div className="mx-auto max-w-7xl px-6 py-6">
-                {/* Search */}
-                <div className="mb-6 flex items-center gap-2 rounded-full border border-gray-300 bg-white px-4 py-2 text-sm text-[#8C7777]">
-                    <Search className="h-4 w-4 shrink-0" />
-                    <input
-                        type="text"
-                        placeholder="Cari tiket konser, artis, kota, atau nomor invoice..."
-                        className="w-full bg-white text-[#1E1E1E] outline-none placeholder:text-[#8C7777]"
-                    />
-                </div>
 
                 {error && (
                     <div className="mb-6 rounded-2xl border border-[#F3D9A4] bg-[#FDF3D8] px-4 py-3 text-sm text-[#B4841F]">
@@ -793,17 +790,9 @@ export default function AdminDashboardPage() {
                                 <Wallet className="h-6 w-6" />
                             </div>
                             <div>
-                                <p className="font-bold">Pendapatan Event</p>
+                                <p className="font-bold">Pendapatan Bersih</p>
                                 <p className="mt-1 text-2xl font-bold">
-                                    {loading && !stats
-                                        ? "—"
-                                        : formatCompactRupiah(
-                                              Math.max(
-                                                  0,
-                                                  Number(stats?.total_sales ?? 0) -
-                                                      Number(stats?.service_fee_collected ?? 0)
-                                              )
-                                          )}
+                                    {loading && !stats ? "—" : formatCompactRupiah(stats?.net_revenue)}
                                 </p>
                             </div>
                         </div>
