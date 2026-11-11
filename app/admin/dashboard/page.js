@@ -15,7 +15,6 @@ import {
     ExternalLink,
     Loader2,
     QrCode,
-    Search,
     Sparkles,
     Ticket,
     TrendingDown,
@@ -407,8 +406,8 @@ export default function AdminDashboardPage() {
                 <div className="mb-6 flex flex-col gap-4 rounded-3xl bg-gradient-to-br from-[#5B0F18] to-[#3A0810] p-8 text-white sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                         <span className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-[#F3D9A4]">
-                            <Sparkles className="h-3.5 w-3.5" />
-                            {profile?.company_name || profile?.username || "Organizer"}
+                            <Sparkles className="h-3.5 w-3.5" />  
+                            {loading && !profile ? "Memuat..." : `${profile?.username || "-"} • Admin`}
                             {unreadCount > 0 && (
                                 <span className="ml-1 rounded-full bg-[#F3D9A4] px-1.5 text-[10px] font-bold text-[#5B0F18]">
                                     {unreadCount}

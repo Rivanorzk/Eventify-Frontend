@@ -120,7 +120,7 @@ export default function CreateAdminPage() {
     const selectedRole = ROLE_OPTIONS.find((r) => r.value === form.role);
 
     return (
-        <div className="mx-auto max-w-2xl">
+        <div className="mx-auto max-w-7xl">
             <Link
                 href="/superadmin/users"
                 className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-[#7A1F2B] hover:underline"
