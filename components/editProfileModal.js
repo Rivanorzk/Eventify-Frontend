@@ -2,9 +2,15 @@
 "use client";
 
 import { useState } from "react";
-import { X, User, Mail, Phone, LockKeyhole, Eye, EyeOff } from "lucide-react";
+import { X, User, Mail, Phone, LockKeyhole, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import { updateProfile, changePassword } from "@/services/userService";
 import { toast } from "react-hot-toast";
+
+const getErrorMessage = (error, fallback) =>
+    error?.response?.data?.message || error?.message || fallback;
+
+// Pesan dari backend untuk password lama yang salah: "Current password salah"
+const isWrongCurrentPassword = (message) => /current password|salah/i.test(message || "");
 
 export default function EditProfileModal({ isOpen, onClose, profile, onUpdate }) {
     const [loading, setLoading] = useState(false);
@@ -12,6 +18,7 @@ export default function EditProfileModal({ isOpen, onClose, profile, onUpdate })
     const [showConfirm, setShowConfirm] = useState(false);
     const [showCurrent, setShowCurrent] = useState(false);
     const [errors, setErrors] = useState({});
+    const [successMessage, setSuccessMessage] = useState("");
 
     const [formData, setFormData] = useState({
         username: profile?.username || "",
@@ -45,8 +52,8 @@ export default function EditProfileModal({ isOpen, onClose, profile, onUpdate })
             if (!formData.current_password) {
                 newErrors.current_password = "Current password is required";
             }
-            if (formData.new_password.length < 6) {
-                newErrors.new_password = "Password must be at least 6 characters";
+            if (formData.new_password.length < 8) {
+                newErrors.new_password = "Password must be at least 8 characters";
             }
             if (formData.new_password !== formData.confirm_password) {
                 newErrors.confirm_password = "Passwords do not match";
@@ -59,37 +66,92 @@ export default function EditProfileModal({ isOpen, onClose, profile, onUpdate })
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!validate()) return;
+        if (loading || successMessage || !validate()) return;
+
+        let passwordChanged = false;
 
         try {
             setLoading(true);
 
-            // 1. Update profile (username, email, phone)
-            await updateProfile({
-                username: formData.username,
-                email: formData.email,
-                phone: formData.phone,
-            });
-
-            // 2. If password fields are filled, change password
+            // 1. Ganti password lebih dulu. Kalau password lama salah, proses
+            //    berhenti di sini dan profil tidak ikut tersimpan.
             if (formData.new_password) {
-                await changePassword({
-                    currentPassword: formData.current_password,
-                    newPassword: formData.new_password,
-                });
+                try {
+                    await changePassword({
+                        currentPassword: formData.current_password,
+                        newPassword: formData.new_password,
+                    });
+                    passwordChanged = true;
+                } catch (error) {
+                    const msg = getErrorMessage(error, "Failed to change password");
+
+                    if (isWrongCurrentPassword(msg)) {
+                        setErrors((prev) => ({
+                            ...prev,
+                            current_password: "Current password is incorrect",
+                        }));
+                        toast.error("Current password is incorrect");
+                    } else {
+                        toast.error(msg);
+                    }
+                    return;
+                }
             }
 
-            toast.success("Profile updated successfully!");
-            onUpdate({
-                username: formData.username,
-                email: formData.email,
-                phone: formData.phone,
-            });
+            // 2. Update profil hanya kalau ada yang berubah.
+            const profileChanged =
+                formData.username !== (profile?.username || "") ||
+                formData.email !== (profile?.email || "") ||
+                formData.phone !== (profile?.phone || "");
+
+            if (profileChanged) {
+                try {
+                    await updateProfile({
+                        username: formData.username,
+                        email: formData.email,
+                        phone: formData.phone,
+                    });
+                } catch (error) {
+                    // Password sudah terlanjur berubah, beri tahu user.
+                    if (passwordChanged) {
+                        toast.success("Password changed successfully, but the profile could not be saved");
+                    }
+                    throw error;
+                }
+            }
+
+            // 3. Konfirmasi sukses: tampil di dalam modal + toast, lalu tutup.
+            const message =
+                passwordChanged && profileChanged
+                    ? "Profile and password updated successfully!"
+                    : passwordChanged
+                    ? "Password changed successfully!"
+                    : profileChanged
+                    ? "Profile updated successfully!"
+                    : "No changes to save.";
+
+            if (passwordChanged || profileChanged) {
+                setSuccessMessage(message);
+                toast.success(message, { id: "edit-profile-success", duration: 4000 });
+                setFormData((prev) => ({
+                    ...prev,
+                    current_password: "",
+                    new_password: "",
+                    confirm_password: "",
+                }));
+                onUpdate({
+                    username: formData.username,
+                    email: formData.email,
+                    phone: formData.phone,
+                });
+                await new Promise((resolve) => setTimeout(resolve, 1500));
+            }
+
+            setSuccessMessage("");
             onClose();
         } catch (error) {
             console.error("Update error:", error);
-            const msg = error?.response?.data?.message || "Failed to update profile";
-            toast.error(msg);
+            toast.error(getErrorMessage(error, "Failed to update profile"));
         } finally {
             setLoading(false);
         }
@@ -97,7 +159,7 @@ export default function EditProfileModal({ isOpen, onClose, profile, onUpdate })
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl max-h-[90vh] overflow-y-auto animate-in fade-in slide-in-from-bottom-4 duration-200">
+            <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl max-h-[90vh] overflow-y-auto animate-in fade-in slide-in-from-bottom-4 duration-200 no-scrollbar">
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-bold text-[#1E1E1E]">Edit Profile</h2>
                     <button
@@ -111,6 +173,16 @@ export default function EditProfileModal({ isOpen, onClose, profile, onUpdate })
                 <p className="text-sm text-[#737373] -mt-4 mb-6">
                     Update your account information. Fill password fields only if you want to change password.
                 </p>
+
+                {successMessage && (
+                    <div
+                        role="status"
+                        className="mb-4 flex items-center gap-2 rounded-xl border border-[#BFE3CD] bg-[#E4F3EA] px-4 py-3 text-sm font-medium text-[#1E7A4C]"
+                    >
+                        <CheckCircle2 className="h-4 w-4 shrink-0" />
+                        {successMessage}
+                    </div>
+                )}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     {/* Username */}
@@ -225,7 +297,7 @@ export default function EditProfileModal({ isOpen, onClose, profile, onUpdate })
                                 className={`w-full pl-10 pr-12 py-2.5 rounded-xl border ${
                                     errors.new_password ? "border-red-500" : "border-[#E5D6D0]"
                                 } focus:border-[#5B0F18] focus:ring-2 focus:ring-[#5B0F18]/20 outline-none transition`}
-                                placeholder="Min 6 characters"
+                                placeholder="Min 8 characters"
                             />
                             <button
                                 type="button"
@@ -268,7 +340,7 @@ export default function EditProfileModal({ isOpen, onClose, profile, onUpdate })
 
                     <button
                         type="submit"
-                        disabled={loading}
+                        disabled={loading || Boolean(successMessage)}
                         className="w-full py-3 rounded-xl bg-[#5B0F18] text-[#F8F1E7] font-semibold hover:bg-[#7A1F2B] transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {loading ? "Saving..." : "Save Changes"}

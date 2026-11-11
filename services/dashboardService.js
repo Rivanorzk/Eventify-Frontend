@@ -23,6 +23,6 @@ export async function getEventAnalytics(eventId, { range = "all" } = {}) {
 }
 
 export async function getOrganizerList(params = {}) {
-    const { data } = await api.get("/dashboard/organizers", { params });
+    const { data } = await api.get("/dashboard/superadmin/admin", { params });
     return data.data;
 }

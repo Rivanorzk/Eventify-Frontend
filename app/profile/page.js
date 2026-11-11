@@ -17,6 +17,7 @@ import {
     ArrowLeft,
     LogOut,
     Image as ImageIcon,
+    Move,
     BadgeCheck,
     Shield,
     Activity,
@@ -30,6 +31,7 @@ import LoadingSpinner from "@/components/loadingSpinner";
 import EmptyState from "@/components/emptyState";
 import EditProfileModal from "@/components/editProfileModal";
 import AvatarCropModal from "@/components/avatarCropModal";
+import CoverCropModal from "@/components/coverCropModal";
 import { toast } from "react-hot-toast";
 
 const MONTHS_ID = [
@@ -66,6 +68,8 @@ export default function ProfilePage() {
 
     const [uploadingCover, setUploadingCover] = useState(false);
     const coverInputRef = useRef(null);
+    const [coverCropOpen, setCoverCropOpen] = useState(false);
+    const [coverImageSrc, setCoverImageSrc] = useState(null);
 
     useEffect(() => {
         loadProfile();
@@ -127,28 +131,58 @@ const handleCroppedAvatar = async (blob) => {
     }
 };
 
-    const handleCoverUpload = async (e) => {
+    // 1) Pilih file -> buka modal pengatur gambar
+    const handleCoverSelect = (e) => {
         const file = e.target.files?.[0];
+        e.target.value = ""; // reset supaya bisa pilih file yang sama lagi
         if (!file) return;
+
         if (!file.type.startsWith("image/")) {
             toast.error("Please select an image file");
             return;
         }
-        if (file.size > 4 * 1024 * 1024) {
-            toast.error("Image size must be less than 4MB");
+        if (file.size > 10 * 1024 * 1024) {
+            toast.error("Image size must be less than 10MB");
             return;
         }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            setCoverImageSrc(reader.result);
+            setCoverCropOpen(true);
+        };
+        reader.onerror = () => toast.error("Gagal membaca file gambar");
+        reader.readAsDataURL(file);
+    };
+
+    // Atur ulang posisi cover yang sudah terpasang
+    const handleAdjustCover = () => {
+        if (!profile?.cover_image) return;
+        setCoverImageSrc(profile.cover_image);
+        setCoverCropOpen(true);
+    };
+
+    const closeCoverCrop = () => {
+        setCoverCropOpen(false);
+        setCoverImageSrc(null);
+    };
+
+    // 2) Setelah klik "Simpan Cover" di modal -> unggah hasil crop
+    const handleCroppedCover = async (blob) => {
         try {
             setUploadingCover(true);
+            const file = new File([blob], `cover-${Date.now()}.jpg`, {
+                type: "image/jpeg",
+            });
             const data = await uploadCover(file);
-            setProfile({ ...profile, cover_image: data.cover_image });
+            setProfile((prev) => ({ ...prev, cover_image: data.cover_image }));
             toast.success("Cover photo updated!");
+            closeCoverCrop();
         } catch (error) {
             console.error("Upload cover error:", error);
             toast.error(error?.response?.data?.message || "Failed to upload cover photo");
         } finally {
             setUploadingCover(false);
-            e.target.value = "";
         }
     };
 
@@ -251,6 +285,17 @@ const handleCroppedAvatar = async (blob) => {
                         <BadgeCheck className="h-4 w-4" />
                         {profile.is_active ? "Akun Terverifikasi" : "Belum Terverifikasi"}
                     </span>
+                    {profile.cover_image && (
+                        <button
+                            type="button"
+                            onClick={handleAdjustCover}
+                            disabled={uploadingCover}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-[#1E1E1E] shadow-sm backdrop-blur-md transition-all hover:bg-white disabled:opacity-60"
+                        >
+                            <Move className="h-4 w-4" />
+                            <span className="hidden sm:inline">Edit Cover</span>
+                        </button>
+                    )}
                     <button
                         type="button"
                         onClick={() => coverInputRef.current?.click()}
@@ -268,7 +313,7 @@ const handleCroppedAvatar = async (blob) => {
                         ref={coverInputRef}
                         type="file"
                         accept="image/*"
-                        onChange={handleCoverUpload}
+                        onChange={handleCoverSelect}
                         className="hidden"
                     />
                 </div>
@@ -602,6 +647,14 @@ const handleCroppedAvatar = async (blob) => {
                 onClose={() => setEditModalOpen(false)}
                 profile={profile}
                 onUpdate={handleUpdateProfile}
+            />
+
+            <CoverCropModal
+                isOpen={coverCropOpen}
+                imageSrc={coverImageSrc}
+                onClose={closeCoverCrop}
+                onCropComplete={handleCroppedCover}
+                saving={uploadingCover}
             />
 
             <AvatarCropModal

@@ -628,7 +628,7 @@ export default function SuperadminDashboardPage() {
                             </p>
                         </div>
                         <Link
-                            href="/superadmin/transactions"
+                            href="/superadmin/orders"
                             className="flex items-center gap-1 text-sm font-semibold text-[#7A1F2B] hover:underline"
                         >
                             Semua Transaksi
@@ -762,7 +762,7 @@ export default function SuperadminDashboardPage() {
                                 </p>
                             </div>
                             <Link
-                                href="/superadmin/organizers"
+                                href="/superadmin/admin"
                                 className="flex items-center gap-1 text-sm font-semibold text-[#7A1F2B] hover:underline"
                             >
                                 Semua
